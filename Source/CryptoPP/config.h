@@ -343,6 +343,17 @@ NAMESPACE_END
 	#define CRYPTOPP_ALLOW_UNALIGNED_DATA_ACCESS
 #endif
 
+//take care of C++11 support
+//use the following to disable C++11 support as whole:
+//#define CRYPTOPP_DISABLE_CPP11
+//use the following to keep C++11 support but disable call-internal multithreading
+//#define CRYPTOPP_DISABLE_INTERNAL_MULTITHREADING
+#if !defined(CRYPTOPP_DISABLE_INTERNAL_MULTITHREADING) && !defined(CRYPTOPP_DISABLE_CPP11) && ((_MSC_VER >= 1700) ) // list other compilers
+#define CRYPTOPP_BOOL_CPP11_THREAD_SUPPORTED 1
+#else
+#define CRYPTOPP_BOOL_CPP11_THREAD_SUPPORTED 0
+#endif
+
 #define CRYPTOPP_VERSION 562
 
 // ***************** determine availability of OS features ********************

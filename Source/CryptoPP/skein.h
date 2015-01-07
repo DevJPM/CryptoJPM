@@ -10,35 +10,6 @@
 
 NAMESPACE_BEGIN(CryptoPP)
 
-	/*
-//! skein
-class Skein : public HashTransformation
-{
-public:
-	// BlockSize = 0 means "choose based on digest size and some nice rules"
-	Skein(const unsigned int DigestSize,unsigned int BlockSize = 0);
-	unsigned int BlockSize() const {return m_Blocksize;}
-	unsigned int DigestSize() const {return static_cast<unsigned int>(m_DigestSize);}
-	std::string AlgorithmName() const {return "Skein-" + IntToString(m_Blocksize*8) + "-" + IntToString(m_DigestSize*8);}
-
-	unsigned int OptimalBlockSize() const {return BlockSize();}
-	unsigned int OptimalDataAlignment() const {return GetAlignmentOf<word64>();}
-
-	void Update(const byte *input, size_t length);
-	void Restart();
-	void TruncatedFinal(byte *hash, size_t size);
-private:
-	size_t m_DigestSize; // 8 bytes are defined by specification, will be fed with 32 bits max :(
-	unsigned int m_Blocksize; // can be: 32, 64 or 128
-	std::auto_ptr<TweakableBlockCipher> m_Threefish; // pointer to the underlying Threefish function
-	word64 m_LowerCounter;
-	word32 m_UpperCounter;
-	FixedSizeSecBlock<byte,128> m_State;
-	SecByteBlock m_BufferForNextBlock;
-private:
-	void IncrementCounters(size_t n);
-};*/
-
 class CRYPTOPP_NO_VTABLE Skein_Main_Provider
 {
 private:

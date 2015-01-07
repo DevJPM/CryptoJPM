@@ -110,7 +110,7 @@ void VMAC_Base::Resynchronize(const byte *nonce, int len)
 	}
 	else
 	{
-		if (m_padCached && (storedNonce[s-1] | 1) == (nonce[length-1] | 1))
+		if (m_padCached && (m_padCached=(storedNonce[s-1] | 1) == (nonce[length-1] | 1)))
 		{
 			m_padCached = VerifyBufsEqual(storedNonce+s-length, nonce, length-1);
 			for (size_t i=0; m_padCached && i<s-length; i++)

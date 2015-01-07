@@ -12,6 +12,7 @@
 #include "gfpcrypt.h"
 #include "dh.h"
 #include "mqv.h"
+#include "fhmqv.h"
 #include "ecp.h"
 #include "ec2n.h"
 
@@ -187,6 +188,16 @@ template <class EC, class COFACTOR_OPTION = CPP_TYPENAME DL_GroupParameters_EC<E
 struct ECMQV
 {
 	typedef MQV_Domain<DL_GroupParameters_EC<EC>, COFACTOR_OPTION> Domain;
+};
+
+//! Fully Hashed Menezes-Qu-Vanstone in GF(p) with key validation,
+/*! <a href="http://eprint.iacr.org/2009/408">A Secure and Efficient Authenticated Diffie–Hellman Protocol</a>
+    Note: this is FHMQV, Protocol 5, from page 11; and not FHMQV-C.
+*/
+template <class EC, class COFACTOR_OPTION = CPP_TYPENAME DL_GroupParameters_EC<EC>::DefaultCofactorOption, class HASH = SHA256>
+struct FHMQV
+{
+	typedef FHMQV_Domain<DL_GroupParameters_EC<EC>, COFACTOR_OPTION, HASH> Domain;
 };
 
 //! EC keys

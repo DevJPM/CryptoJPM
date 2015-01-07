@@ -36,5 +36,6 @@
 #include "..\CryptoPP\threefish.h"
 #include "..\CryptoPP\skein.h"
 #include "..\CryptoPP\scrypt.h"
+#include "..\CryptoPP\vmac.h"
 
 // TODO: Hier auf zusätzliche Header, die das Programm erfordert, verweisen.

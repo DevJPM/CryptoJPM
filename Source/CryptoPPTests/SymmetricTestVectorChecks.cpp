@@ -290,7 +290,7 @@ namespace CryptoPPTests
 			Assert::IsTrue(Hasher.VerifyDigest(TestVectorResult3,TestData3,256),L"Skein-1024-1024 check failed.",LINE_INFO());
 		}
 
-		TEST_METHOD(ScryptTestVectorChecks)
+		/*TEST_METHOD(ScryptTestVectorChecks)
 		{
 			OriginalScrypt Instance;
 			
@@ -337,6 +337,39 @@ namespace CryptoPPTests
 			Assert::IsTrue(memcmp(Compare2,TestVector2,64)==0,L"scrypt test 2 failed.",LINE_INFO());
 			Assert::IsTrue(memcmp(Compare3,TestVector3,64)==0,L"scrypt test 3 failed.",LINE_INFO());
 			Assert::IsTrue(memcmp(Compare4,TestVector4,64)==0,L"scrypt test 4 failed.",LINE_INFO());
+		}*/
+
+		TEST_METHOD(VMACCheck)
+		{
+			AutoSeededRandomPool RNG;
+			FixedSizeSecBlock<byte,32> Key;
+			RNG.GenerateBlock(Key,Key.size());
+			FixedSizeSecBlock<byte,16> Nonce0;
+			RNG.GenerateBlock(Nonce0,Nonce0.size());
+			FixedSizeSecBlock<byte,16> Nonce1;
+			RNG.GenerateBlock(Nonce1,Nonce1.size());
+			FixedSizeSecBlock<byte,8> Tag0;
+			FixedSizeSecBlock<byte,8> Tag1;
+			FixedSizeSecBlock<byte,64> TestData;
+			RNG.GenerateBlock(TestData,TestData.size());
+
+			VMAC<AES,64> Hasher;
+			Hasher.SetKeyWithIV(Key,Key.size(),Nonce0,Nonce0.size());
+			Hasher.CalculateDigest(Tag0,TestData,TestData.size());
+			Hasher.Resynchronize(Nonce1,Nonce1.size());
+			Hasher.CalculateDigest(Tag1,TestData,TestData.size());
+
+			Assert::IsFalse(memcmp(Tag0,Tag1,Tag0.size())==0,L"VMAC check failed, digests are equal",LINE_INFO());
+		}
+
+		TEST_METHOD(BLAKE2bTestVectorChecks)
+		{
+
+		}
+
+		TEST_METHOD(BLAKE2sTestVectorChecks)
+		{
+
 		}
 	};
 }

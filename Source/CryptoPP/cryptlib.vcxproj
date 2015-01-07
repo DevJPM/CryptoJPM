@@ -432,6 +432,8 @@
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Disabled</Optimization>
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Disabled</Optimization>
     </ClCompile>
+    <ClCompile Include="blake2b.cpp" />
+    <ClCompile Include="blake2s.cpp" />
     <ClCompile Include="blowfish.cpp">
       <Optimization Condition="'$(Configuration)|$(Platform)'=='DLL-Import Debug|Win32'">Disabled</Optimization>
       <Optimization Condition="'$(Configuration)|$(Platform)'=='DLL-Import Debug|x64'">Disabled</Optimization>
@@ -645,6 +647,7 @@
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Disabled</Optimization>
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Disabled</Optimization>
     </ClCompile>
+    <ClCompile Include="fhmqv.cpp" />
     <ClCompile Include="files.cpp">
       <Optimization Condition="'$(Configuration)|$(Platform)'=='DLL-Import Debug|Win32'">Disabled</Optimization>
       <Optimization Condition="'$(Configuration)|$(Platform)'=='DLL-Import Debug|x64'">Disabled</Optimization>
@@ -1396,6 +1399,8 @@ echo: &gt;&gt; adhoc.cpp.copied
     <ClInclude Include="base32.h" />
     <ClInclude Include="base64.h" />
     <ClInclude Include="basecode.h" />
+    <ClInclude Include="blake2b.h" />
+    <ClInclude Include="blake2s.h" />
     <ClInclude Include="blowfish.h" />
     <ClInclude Include="blumshub.h" />
     <ClInclude Include="camellia.h" />
@@ -1422,6 +1427,7 @@ echo: &gt;&gt; adhoc.cpp.copied
     <ClInclude Include="emsa2.h" />
     <ClInclude Include="eprecomp.h" />
     <ClInclude Include="esign.h" />
+    <ClInclude Include="fhmqv.h" />
     <ClInclude Include="files.h" />
     <ClInclude Include="filters.h" />
     <ClInclude Include="fips140.h" />

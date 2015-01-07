@@ -11,6 +11,7 @@
 #include "dsa.h"
 #include "dh.h"
 #include "mqv.h"
+#include "fhmqv.h"
 #include "luc.h"
 #include "xtrcrypt.h"
 #include "rabin.h"

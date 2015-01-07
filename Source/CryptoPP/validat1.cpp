@@ -100,6 +100,7 @@ bool ValidateAll(bool thorough)
 	pass=ValidateBBS() && pass;
 	pass=ValidateDH() && pass;
 	pass=ValidateMQV() && pass;
+	pass=ValidateFHMQV() && pass;
 	pass=ValidateRSA() && pass;
 	pass=ValidateElGamal() && pass;
 	pass=ValidateDLIES() && pass;
