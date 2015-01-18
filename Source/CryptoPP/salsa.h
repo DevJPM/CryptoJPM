@@ -13,7 +13,7 @@ struct Salsa20_Info : public VariableKeyLength<32, 16, 32, 16, SimpleKeyingInter
 	static const char *StaticAlgorithmName() {return "Salsa20";}
 };
 
-class CRYPTOPP_NO_VTABLE Salsa20_Policy : public AdditiveCipherConcretePolicy<word32, 16>
+class CRYPTOPP_NO_VTABLE Salsa20_Policy : public AdditiveCipherConcretePolicy<word32, 16>, public Salsa20_Info
 {
 protected:
 	void CipherSetKey(const NameValuePairs &params, const byte *key, size_t length);

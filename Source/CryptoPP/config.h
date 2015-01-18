@@ -46,6 +46,9 @@
 // set the name of Rijndael cipher, was "Rijndael" before version 5.3
 #define CRYPTOPP_RIJNDAEL_NAME "AES"
 
+// define to drop suffixes from Integer (eg, 1234567890 vs 1234567890. and 1234567890h)
+// #define CRYPTOPP_NO_INTEGER_SUFFIX
+
 // ***************** Important Settings Again ********************
 // But the defaults should be ok.
 

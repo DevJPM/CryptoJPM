@@ -3424,7 +3424,11 @@ std::ostream& operator<<(std::ostream& out, const Integer &a)
 //		if (i && !(i%block))
 //			out << ",";
 	}
+#if defined(CRYPTOPP_NO_INTEGER_SUFFIX)
+	return out;
+#else
 	return out << suffix;
+#endif
 }
 
 Integer& Integer::operator++()

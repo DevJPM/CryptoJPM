@@ -37,5 +37,7 @@
 #include "..\CryptoPP\skein.h"
 #include "..\CryptoPP\scrypt.h"
 #include "..\CryptoPP\vmac.h"
+#include "..\CryptoPP\blake2b.h"
+#include "..\CryptoPP\blake2s.h"
 
 // TODO: Hier auf zusätzliche Header, die das Programm erfordert, verweisen.

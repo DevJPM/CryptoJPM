@@ -404,6 +404,15 @@
     <ClCompile Include="fhmqv.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="pem-com.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="pem-rd.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="pem-wr.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="Doxyfile">
@@ -817,6 +826,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="fhmqv.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="pem-com.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="pem.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

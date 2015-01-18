@@ -5,6 +5,9 @@
 #include "pch.h"
 #include "blake2b.h"
 #include "cpu.h"
+#if CRYPTOPP_BOOL_CPP11_THREAD_SUPPORTED
+#include <thread>
+#endif
 
 #define LOAD_MSG_0_1(b0, b1) b0 = _mm_set_epi64x(m2, m0); b1 = _mm_set_epi64x(m6, m4)
 #define LOAD_MSG_0_2(b0, b1) b0 = _mm_set_epi64x(m3, m1); b1 = _mm_set_epi64x(m7, m5)
@@ -197,8 +200,8 @@ void BLAKE2b::Restart()
 	m_buflen=0;
 	m_last_node=0;
 
-	FixedSizeSecBlock<byte,BLOCKSIZE> Params;
-	memset_z(Params,0,BLOCKSIZE);
+	FixedSizeSecBlock<byte,MAX_DIGEST_SIZE> Params;
+	memset_z(Params,0,MAX_DIGEST_SIZE);
 	Params[0]=m_Digestsize;
 	Params[2]=1;
 	Params[3]=1;
@@ -206,12 +209,13 @@ void BLAKE2b::Restart()
 	const byte* IVPtr = (const byte*) blake2b_IV;
 	const byte* ParamsPtr = Params;
 
-	for(int i=0;i<BLOCKSIZE;++i)
-		m_h[i] = IVPtr[i] ^ ParamsPtr[i];
+	for(int i=0;i<MAX_DIGEST_SIZE;++i)
+		m_h.BytePtr()[i] = IVPtr[i] ^ ParamsPtr[i];
 }
 
 void BLAKE2b::TruncatedFinal(byte *digest, size_t digestSize)
 {
+	ThrowIfInvalidTruncatedSize(digestSize);
 	if( m_buflen > BLOCKSIZE )
 	{
 		IncrementCounter( BLOCKSIZE );
@@ -225,6 +229,8 @@ void BLAKE2b::TruncatedFinal(byte *digest, size_t digestSize)
 	memset_z( m_buf.BytePtr() + m_buflen, 0, 2 * BLOCKSIZE - m_buflen ); /* Padding */
 	Compress( m_buf.BytePtr() );
 	memcpy( digest, &m_h[0], digestSize );
+
+	Restart();
 }
 
 void BLAKE2b::Compress(const byte* block)
@@ -401,23 +407,27 @@ void BLAKE2bMAC::Restart()
 	m_buflen=0;
 	m_last_node=0;
 
-	FixedSizeSecBlock<byte,BLOCKSIZE> Params;
-	memset_z(Params,0,BLOCKSIZE);
-	Params[0]=m_Digestsize;
-	Params[2]=1;
-	Params[3]=1;
+	FixedSizeSecBlock<byte,MAX_DIGEST_SIZE> Params;
+	//SecByteBlock Params(BLOCKSIZE);
+	memset_z(Params,0,MAX_DIGEST_SIZE);
+	Params.BytePtr()[0]=m_Digestsize;
+	Params.BytePtr()[1]=m_Keylen;
+	Params.BytePtr()[2]=(byte)1;
+	Params.BytePtr()[3]=(byte)1;
+	
 
 	const byte* IVPtr = (const byte*) blake2b_IV;
 	const byte* ParamsPtr = Params;
 
-	for(int i=0;i<BLOCKSIZE;++i)
-		m_h[i] = IVPtr[i] ^ ParamsPtr[i];
+	for(int i=0;i<MAX_DIGEST_SIZE;++i)
+		m_h.BytePtr()[i] = IVPtr[i] ^ ParamsPtr[i];
 
 	Update(m_Key,BLOCKSIZE);
 }
 
 void BLAKE2bMAC::TruncatedFinal(byte *digest, size_t digestSize)
 {
+	ThrowIfInvalidTruncatedSize(digestSize);
 	if( m_buflen > BLOCKSIZE )
 	{
 		IncrementCounter( BLOCKSIZE );
@@ -431,6 +441,8 @@ void BLAKE2bMAC::TruncatedFinal(byte *digest, size_t digestSize)
 	memset_z( m_buf.BytePtr() + m_buflen, 0, 2 * BLOCKSIZE - m_buflen ); /* Padding */
 	Compress( m_buf.BytePtr() );
 	memcpy( digest, &m_h[0], digestSize );
+
+	Restart();
 }
 
 void BLAKE2bMAC::Compress(const byte* block)
@@ -560,6 +572,327 @@ void BLAKE2bMAC::Update(const byte *input, size_t length)
 			input += length;
 			length -= length;
 		}
+	}
+}
+
+BLAKE2bp::BLAKE2bRoot::BLAKE2bRoot(unsigned int DigestSize) :
+	BLAKE2b(DigestSize)
+{
+}
+
+void BLAKE2bp::BLAKE2bRoot::Restart()
+{
+	memset_z(m_h,0,m_h.SizeInBytes());
+	memset_z(m_t,0,m_t.SizeInBytes());
+	memset_z(m_f,0,m_f.SizeInBytes());
+	memset_z(m_buf,0,m_buf.SizeInBytes());
+	m_buflen=0;
+	m_last_node=1;
+
+	FixedSizeSecBlock<byte,MAX_DIGEST_SIZE> Params;
+	memset_z(Params,0,MAX_DIGEST_SIZE);
+	Params[0]=m_Digestsize;
+	Params[2]=PARALLELISM_DEGREE; //fanout
+	Params[3]=2; //depth
+	Params[16]=1; // node_depth
+	Params[17]=MAX_DIGEST_SIZE; // inner length
+
+	const byte* IVPtr = (const byte*) blake2b_IV;
+	const byte* ParamsPtr = Params;
+
+	for(int i=0;i<MAX_DIGEST_SIZE;++i)
+		m_h.BytePtr()[i] = IVPtr[i] ^ ParamsPtr[i];
+}
+
+BLAKE2bp::BLAKE2bLeaf::BLAKE2bLeaf(unsigned int DigestSize,bool IsLastNode,word64 Offset) :
+	BLAKE2b(DigestSize),m_IsLastNode(IsLastNode),m_Offset(Offset)
+{
+}
+
+void BLAKE2bp::BLAKE2bLeaf::Restart()
+{
+	memset_z(m_h,0,m_h.SizeInBytes());
+	memset_z(m_t,0,m_t.SizeInBytes());
+	memset_z(m_f,0,m_f.SizeInBytes());
+	memset_z(m_buf,0,m_buf.SizeInBytes());
+	m_buflen=0;
+	m_last_node=0;
+
+	if(m_IsLastNode)
+		m_last_node=1;
+
+	FixedSizeSecBlock<byte,MAX_DIGEST_SIZE> Params;
+	memset_z(Params,0,MAX_DIGEST_SIZE);
+	Params[0]=m_Digestsize;
+	Params[2]=PARALLELISM_DEGREE; //fanout
+	Params[3]=2; //depth
+	*((word64*)(&Params[8]))=m_Offset; // node_depth
+	Params[17]=MAX_DIGEST_SIZE; // inner length
+
+	const byte* IVPtr = (const byte*) blake2b_IV;
+	const byte* ParamsPtr = Params;
+
+	for(int i=0;i<MAX_DIGEST_SIZE;++i)
+		m_h.BytePtr()[i] = IVPtr[i] ^ ParamsPtr[i];
+}
+
+BLAKE2bp::BLAKE2bp(unsigned int Digestsize):
+	m_Root(Digestsize),m_Digestsize(Digestsize),m_buflen(0)
+{
+	if(Digestsize>64 || !Digestsize)
+		throw(InvalidArgument("invalid Digestsize!"));
+
+	for(unsigned int i=0;i<PARALLELISM_DEGREE;++i)
+		m_Leaves.push_back(BLAKE2bLeaf(Digestsize,i==(PARALLELISM_DEGREE-1),i));
+}
+
+void BLAKE2bp::Restart()
+{
+	m_Root.Restart();
+	for(unsigned int i=0;i<PARALLELISM_DEGREE;++i)
+		m_Leaves.at(i).Restart();
+}
+
+void BLAKE2bp::Update(const byte *input, size_t length)
+{
+	size_t left = m_buflen;
+	size_t fill = m_buf.SizeInBytes() - left;
+
+	if( left && length >= fill )
+	{
+		memcpy( m_buf + left, input, fill );
+
+		for( size_t i = 0; i < PARALLELISM_DEGREE; ++i )
+			m_Leaves.at(i).Update( m_buf + i * BLOCKSIZE, BLOCKSIZE );
+
+		input += fill;
+		length -= fill;
+		left = 0;
+	}
+
+#if CRYPTOPP_BOOL_CPP11_THREAD_SUPPORTED
+	std::vector<std::thread> ThreadVector(PARALLELISM_DEGREE);
+	for(unsigned int i=0;i<PARALLELISM_DEGREE;++i)
+		ThreadVector.at(i)=std::thread(&BLAKE2bp::ThreadUpdate,this,i,input,length);
+	for(std::vector<std::thread>::iterator it=ThreadVector.begin();it!=ThreadVector.end();++it)
+		it->join();
+#else
+	for(unsigned int i=0;i<PARALLELISM_DEGREE;++i)
+		ThreadUpdate(i,input,length);
+#endif
+
+	input += length - length % ( PARALLELISM_DEGREE * BLOCKSIZE );
+	length %= PARALLELISM_DEGREE * BLOCKSIZE;
+
+	if( length > 0 )
+		memcpy( m_buf + left, input, length );
+
+	m_buflen = left + length;
+}
+
+void BLAKE2bp::TruncatedFinal(byte *digest, size_t digestSize)
+{
+	FixedSizeSecBlock<byte,MAX_DIGEST_SIZE> hash[PARALLELISM_DEGREE];
+
+	for( size_t i = 0; i < PARALLELISM_DEGREE; ++i )
+	{
+		if( m_buflen > i * BLOCKSIZE )
+		{
+			size_t left = m_buflen - i * BLOCKSIZE;
+
+			if( left > BLOCKSIZE )
+				left = BLOCKSIZE;
+
+			m_Leaves.at(i).Update(  m_buf + i * BLOCKSIZE, left );
+		}
+
+		m_Leaves.at(i).Final( hash[i] );
+	}
+
+	for( size_t i = 0; i < PARALLELISM_DEGREE; ++i )
+		m_Root.Update(hash[i],MAX_DIGEST_SIZE);
+
+	m_Root.TruncatedFinal(digest,digestSize);
+
+	Restart();
+}
+
+void BLAKE2bp::ThreadUpdate(unsigned int ID,const byte* input, size_t length)
+{
+	uint64_t inlen__ = length;
+	const uint8_t *in__ = ( const uint8_t * )input;
+	in__ += ID * BLOCKSIZE;
+
+	while( inlen__ >= PARALLELISM_DEGREE * BLOCKSIZE )
+	{
+		m_Leaves.at(ID).Update( in__, BLOCKSIZE );
+		in__ += PARALLELISM_DEGREE * BLOCKSIZE;
+		inlen__ -= PARALLELISM_DEGREE * BLOCKSIZE;
+	}
+}
+
+BLAKE2bpMAC::BLAKE2bMACRoot::BLAKE2bMACRoot(unsigned int DigestSize,unsigned int keylen) :
+	BLAKE2b(DigestSize),m_Keylen(keylen)
+{
+	Restart();
+}
+
+void BLAKE2bpMAC::BLAKE2bMACRoot::Restart()
+{
+	memset_z(m_h,0,m_h.SizeInBytes());
+	memset_z(m_t,0,m_t.SizeInBytes());
+	memset_z(m_f,0,m_f.SizeInBytes());
+	memset_z(m_buf,0,m_buf.SizeInBytes());
+	m_buflen=0;
+	m_last_node=1;
+
+	FixedSizeSecBlock<byte,MAX_DIGEST_SIZE> Params;
+	memset_z(Params,0,MAX_DIGEST_SIZE);
+	Params[0]=m_Digestsize;
+	Params[1]=m_Keylen;
+	Params[2]=PARALLELISM_DEGREE; //fanout
+	Params[3]=2; //depth
+	Params[16]=1; // node_depth
+	Params[17]=MAX_DIGEST_SIZE; // inner length
+
+	const byte* IVPtr = (const byte*) blake2b_IV;
+	const byte* ParamsPtr = Params;
+
+	for(int i=0;i<MAX_DIGEST_SIZE;++i)
+		m_h.BytePtr()[i] = IVPtr[i] ^ ParamsPtr[i];
+}
+
+BLAKE2bpMAC::BLAKE2bMACLeaf::BLAKE2bMACLeaf(unsigned int DigestSize,const byte* Key,unsigned int keylen,bool IsLastNode,word64 Offset) :
+	BLAKE2bMAC(DigestSize,Key,keylen),m_IsLastNode(IsLastNode),m_Offset(Offset)
+{
+	Restart();
+}
+
+void BLAKE2bpMAC::BLAKE2bMACLeaf::Restart()
+{
+	memset_z(m_h,0,m_h.SizeInBytes());
+	memset_z(m_t,0,m_t.SizeInBytes());
+	memset_z(m_f,0,m_f.SizeInBytes());
+	memset_z(m_buf,0,m_buf.SizeInBytes());
+	m_buflen=0;
+	m_last_node=0;
+
+	if(m_IsLastNode)
+		m_last_node=1;
+
+	FixedSizeSecBlock<byte,MAX_DIGEST_SIZE> Params;
+	memset_z(Params,0,MAX_DIGEST_SIZE);
+	Params[0]=m_Digestsize;
+	Params[1]=m_Keylen;
+	Params[2]=PARALLELISM_DEGREE; //fanout
+	Params[3]=2; //depth
+	*((word64*)(&Params[8]))=m_Offset; // offset
+	Params[16]=0; // node_depth: 0 for leaf and 1 for root 
+	Params[17]=MAX_DIGEST_SIZE; // inner length
+
+	const byte* IVPtr = (const byte*) blake2b_IV;
+	const byte* ParamsPtr = Params;
+
+	for(int i=0;i<MAX_DIGEST_SIZE;++i)
+		m_h.BytePtr()[i] = IVPtr[i] ^ ParamsPtr[i];
+
+	Update(m_Key,BLOCKSIZE);
+}
+
+BLAKE2bpMAC::BLAKE2bpMAC(unsigned int Digestsize,const byte* Key,unsigned int Keylength):
+	m_Root(Digestsize,Keylength),m_Digestsize(Digestsize),m_buflen(0)
+{
+	if(Digestsize>64 || !Digestsize)
+		throw(InvalidArgument("invalid Digestsize!"));
+
+	for(unsigned int i=0;i<PARALLELISM_DEGREE;++i)
+		m_Leaves.push_back(BLAKE2bMACLeaf(Digestsize,Key,Keylength,i==(PARALLELISM_DEGREE-1),i));
+
+	Restart();
+}
+
+void BLAKE2bpMAC::Restart()
+{
+	m_Root.Restart();
+	for(unsigned int i=0;i<PARALLELISM_DEGREE;++i)
+		m_Leaves.at(i).Restart();
+}
+
+void BLAKE2bpMAC::Update(const byte *input, size_t length)
+{
+	size_t left = m_buflen;
+	size_t fill = m_buf.SizeInBytes() - left;
+
+	if( left && length >= fill )
+	{
+		memcpy( m_buf + left, input, fill );
+
+		for( size_t i = 0; i < PARALLELISM_DEGREE; ++i )
+			m_Leaves.at(i).Update( m_buf + i * BLOCKSIZE, BLOCKSIZE );
+
+		input += fill;
+		length -= fill;
+		left = 0;
+	}
+
+#if CRYPTOPP_BOOL_CPP11_THREAD_SUPPORTED
+	std::vector<std::thread> ThreadVector(PARALLELISM_DEGREE);
+	for(unsigned int i=0;i<PARALLELISM_DEGREE;++i)
+		ThreadVector.at(i)=std::thread(&BLAKE2bpMAC::ThreadUpdate,this,i,input,length);
+	for(std::vector<std::thread>::iterator it=ThreadVector.begin();it!=ThreadVector.end();++it)
+		it->join();
+#else
+	for(unsigned int i=0;i<PARALLELISM_DEGREE;++i)
+		ThreadUpdate(i,input,length);
+#endif
+
+	input += length - length % ( PARALLELISM_DEGREE * BLOCKSIZE );
+	length %= PARALLELISM_DEGREE * BLOCKSIZE;
+
+	if( length > 0 )
+		memcpy( m_buf + left, input, length );
+
+	m_buflen = left + length;
+}
+
+void BLAKE2bpMAC::TruncatedFinal(byte *digest, size_t digestSize)
+{
+	FixedSizeSecBlock<byte,MAX_DIGEST_SIZE> hash[PARALLELISM_DEGREE];
+
+	for( size_t i = 0; i < PARALLELISM_DEGREE; ++i )
+	{
+		if( m_buflen > i * BLOCKSIZE )
+		{
+			size_t left = m_buflen - i * BLOCKSIZE;
+
+			if( left > BLOCKSIZE )
+				left = BLOCKSIZE;
+
+			m_Leaves.at(i).Update(  m_buf + i * BLOCKSIZE, left );
+		}
+
+		m_Leaves.at(i).Final( hash[i] );
+	}
+
+	for( size_t i = 0; i < PARALLELISM_DEGREE; ++i )
+		m_Root.Update(hash[i],MAX_DIGEST_SIZE);
+
+	m_Root.TruncatedFinal(digest,digestSize);
+
+	Restart();
+}
+
+void BLAKE2bpMAC::ThreadUpdate(unsigned int ID,const byte* input, size_t length)
+{
+	uint64_t inlen__ = length;
+	const uint8_t *in__ = ( const uint8_t * )input;
+	in__ += ID * BLOCKSIZE;
+
+	while( inlen__ >= PARALLELISM_DEGREE * BLOCKSIZE )
+	{
+		m_Leaves.at(ID).Update( in__, BLOCKSIZE );
+		in__ += PARALLELISM_DEGREE * BLOCKSIZE;
+		inlen__ -= PARALLELISM_DEGREE * BLOCKSIZE;
 	}
 }
 

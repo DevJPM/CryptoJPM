@@ -939,6 +939,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="pem-com.cpp" />
+    <ClCompile Include="pem-rd.cpp" />
+    <ClCompile Include="pem-wr.cpp" />
     <ClCompile Include="pkcspad.cpp">
       <Optimization Condition="'$(Configuration)|$(Platform)'=='DLL-Import Debug|Win32'">Disabled</Optimization>
       <Optimization Condition="'$(Configuration)|$(Platform)'=='DLL-Import Debug|x64'">Disabled</Optimization>
@@ -1467,6 +1470,8 @@ echo: &gt;&gt; adhoc.cpp.copied
     <ClInclude Include="osrng.h" />
     <ClInclude Include="panama.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="pem-com.h" />
+    <ClInclude Include="pem.h" />
     <ClInclude Include="pkcspad.h" />
     <ClInclude Include="polynomi.h" />
     <ClInclude Include="pssr.h" />
