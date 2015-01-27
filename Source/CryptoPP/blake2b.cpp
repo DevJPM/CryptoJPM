@@ -9,6 +9,15 @@
 #include <thread>
 #endif
 
+#if CRYPTOPP_BOOL_X86
+#define DISABLE_SSE_LOCALLY
+#endif
+
+#if defined(_MSC_VER) && CRYPTOPP_BOOL_X86
+#define _mm_set_epi64x(x,y) _mm_setr_epi32(((int*)(&(x)))[0],((int*)(&(x)))[1],((int*)(&(y)))[0],((int*)(&(y)))[1])
+//#define _mm_set_epi64x(x,y) _mm_set_epi32(((int*)(&(y)))[0],((int*)(&(y)))[1],((int*)(&(x)))[0],((int*)(&(x)))[1])
+#endif
+
 #define LOAD_MSG_0_1(b0, b1) b0 = _mm_set_epi64x(m2, m0); b1 = _mm_set_epi64x(m6, m4)
 #define LOAD_MSG_0_2(b0, b1) b0 = _mm_set_epi64x(m3, m1); b1 = _mm_set_epi64x(m7, m5)
 #define LOAD_MSG_0_3(b0, b1) b0 = _mm_set_epi64x(m10, m8); b1 = _mm_set_epi64x(m14, m12)
@@ -235,7 +244,7 @@ void BLAKE2b::TruncatedFinal(byte *digest, size_t digestSize)
 
 void BLAKE2b::Compress(const byte* block)
 {
-#if CRYPTOPP_BOOL_SSE2_INTRINSICS_AVAILABLE
+#if CRYPTOPP_BOOL_SSE2_INTRINSICS_AVAILABLE && !defined(DISABLE_SSE_LOCALLY)
 if(HasSSSE3() && HasSSE2())
 {
   __m128i row1l, row1h;
@@ -352,7 +361,7 @@ else
   for( i = 0; i < 8; ++i )
 	m_h[i] = m_h[i] ^ v[i] ^ v[i + 8];
 
-#if CRYPTOPP_BOOL_SSE2_INTRINSICS_AVAILABLE
+#if CRYPTOPP_BOOL_SSE2_INTRINSICS_AVAILABLE && !defined(DISABLE_SSE_LOCALLY)
 }
 #endif
 }
@@ -447,7 +456,7 @@ void BLAKE2bMAC::TruncatedFinal(byte *digest, size_t digestSize)
 
 void BLAKE2bMAC::Compress(const byte* block)
 {
-#if CRYPTOPP_BOOL_SSE2_INTRINSICS_AVAILABLE
+#if CRYPTOPP_BOOL_SSE2_INTRINSICS_AVAILABLE && !defined(DISABLE_SSE_LOCALLY)
 if(HasSSSE3() && HasSSE2())
 {
   __m128i row1l, row1h;
@@ -542,7 +551,7 @@ else
   for( i = 0; i < 8; ++i )
 	m_h[i] = m_h[i] ^ v[i] ^ v[i + 8];
 
-#if CRYPTOPP_BOOL_SSE2_INTRINSICS_AVAILABLE
+#if CRYPTOPP_BOOL_SSE2_INTRINSICS_AVAILABLE && !defined(DISABLE_SSE_LOCALLY)
 }
 #endif
 }

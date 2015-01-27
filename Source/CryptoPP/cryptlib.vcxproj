@@ -680,6 +680,7 @@
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Disabled</Optimization>
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Disabled</Optimization>
     </ClCompile>
+    <ClCompile Include="Fortuna.cpp" />
     <ClCompile Include="gcm.cpp" />
     <ClCompile Include="gf256.cpp">
       <Optimization Condition="'$(Configuration)|$(Platform)'=='DLL-Import Debug|Win32'">Disabled</Optimization>
@@ -1435,6 +1436,7 @@ echo: &gt;&gt; adhoc.cpp.copied
     <ClInclude Include="filters.h" />
     <ClInclude Include="fips140.h" />
     <ClInclude Include="fltrimpl.h" />
+    <ClInclude Include="Fortuna.h" />
     <ClInclude Include="gcm.h" />
     <ClInclude Include="gf256.h" />
     <ClInclude Include="gf2_32.h" />

@@ -30,11 +30,11 @@ void PasswordBasedKeyDerivationFunction::ThrowIfInvalidTCost(size_t tCost) const
 		throw(InvalidArgument("tCost may not be zero!"));
 }
 
-size_t PasswordBasedKeyDerivationFunction::GetMCostFromPeakNumberBytes(size_t PeakNumberBytes) const
+word64 PasswordBasedKeyDerivationFunction::GetMCostFromPeakNumberBytes(size_t PeakNumberBytes) const
 {
 	if(!MaxMCost())
 		throw(InvalidArgument("mCost is not supported for this function"));
-	size_t TestMCost = 1;
+	word64 TestMCost = 1;
 	while(MaxMemoryUsage(TestMCost)<=PeakNumberBytes)
 	{
 		if(TestMCost<=MaxMCost())
@@ -46,7 +46,7 @@ size_t PasswordBasedKeyDerivationFunction::GetMCostFromPeakNumberBytes(size_t Pe
 	return TestMCost-1;
 }
 
-double PasswordBasedKeyDerivationFunction::MeasureTime(size_t mCost,size_t tCost,size_t TestDataSetSize) const
+double PasswordBasedKeyDerivationFunction::MeasureTime(word64 mCost,word64 tCost,size_t TestDataSetSize) const
 {
 	ThrowIfInvalidMCost(mCost);
 	ThrowIfInvalidTCost(tCost);
@@ -64,11 +64,11 @@ double PasswordBasedKeyDerivationFunction::MeasureTime(size_t mCost,size_t tCost
 	return timer.ElapsedTimeAsDouble();
 }
 
-size_t PasswordBasedKeyDerivationFunction::SearchMCost(size_t tCost,double TimeInSeconds,size_t TestDataSetSize) const
+word64 PasswordBasedKeyDerivationFunction::SearchMCost(word64 tCost,double TimeInSeconds,size_t TestDataSetSize) const
 {
 	if(!MaxMCost())
 		throw(InvalidArgument("this function does not support mCost!"));
-	size_t ProbableMCost=1;
+	word64 ProbableMCost=1;
 	while(MeasureTime(ProbableMCost,tCost,TestDataSetSize)<TimeInSeconds)
 	{
 		if(ProbableMCost<MaxMCost())
@@ -79,9 +79,9 @@ size_t PasswordBasedKeyDerivationFunction::SearchMCost(size_t tCost,double TimeI
 	return ProbableMCost;
 }
 
-size_t PasswordBasedKeyDerivationFunction::SearchTCost(size_t mCost,double TimeInSeconds,size_t TestDataSetSize) const
+word64 PasswordBasedKeyDerivationFunction::SearchTCost(word64 mCost,double TimeInSeconds,size_t TestDataSetSize) const
 {
-	size_t ProbableTCost=1;
+	word64 ProbableTCost=1;
 	while(MeasureTime(mCost,ProbableTCost,TestDataSetSize)<TimeInSeconds)
 	{
 		if(ProbableTCost<MaxTCost())

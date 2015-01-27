@@ -263,6 +263,20 @@ struct ECIES
 	static std::string CRYPTOPP_API StaticAlgorithmName() {return "ECIES";}	// TODO: fix this after name is standardized
 };
 
+// Set DHAES=true and BC_COMPAT=true for DL_EncryptionAlgorithm_Xor if interop'ing with Bouncy Castle.
+//   See https://groups.google.com/d/msg/cryptopp-users/vR8GSL8wxPA/Bf9koUDyZ88J.
+template <class EC, class COFACTOR_OPTION = NoCofactorMultiplication>
+struct ECIES_BC
+	: public DL_ES<
+		DL_Keys_EC<EC>,
+		DL_KeyAgreementAlgorithm_DH<typename EC::Point, COFACTOR_OPTION>,
+		DL_KeyDerivationAlgorithm_P1363<typename EC::Point, true, P1363_KDF2<SHA1> >,
+		DL_EncryptionAlgorithm_Xor<HMAC<SHA1>, true, true>,
+		ECIES<EC> >
+{
+	static std::string CRYPTOPP_API StaticAlgorithmName() {return "ECIES-BC";}	// TODO: fix this after name is standardized
+};
+
 NAMESPACE_END
 
 #ifdef CRYPTOPP_MANUALLY_INSTANTIATE_TEMPLATES

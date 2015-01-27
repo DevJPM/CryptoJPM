@@ -570,7 +570,7 @@ void PEM_CipherForAlgorithm(string algorithm, auto_ptr<StreamTransformation>& st
     //   {NULL,0} parameters are the OUT IV. However, the original IV in the PEM
     //   header is used; and not the derived IV.
     Weak::MD5 md5;
-    int ret = OPENSSL_EVP_BytesToKey(md5, _salt.data(), _pword, _plen, 1, _key.data(), _key.size(), NULL, 0);
+    int ret = OPENSSL_EVP_BytesToKey(md5, _salt.data(), _pword, _plen, 1, _key.data(), static_cast<unsigned int>(_key.size()), NULL, 0);
     if(ret != static_cast<int>(ksize))
         throw Exception(Exception::OTHER_ERROR, "PEM_CipherForAlgorithm: EVP_BytesToKey failed");
     

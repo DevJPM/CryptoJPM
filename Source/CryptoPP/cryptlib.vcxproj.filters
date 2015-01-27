@@ -413,6 +413,9 @@
     <ClCompile Include="pem-wr.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Fortuna.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="Doxyfile">
@@ -832,6 +835,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="pem.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Fortuna.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

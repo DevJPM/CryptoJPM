@@ -104,7 +104,7 @@ int CompareNoCase(const SecByteBlock& first, const SecByteBlock& second)
 
 // From crypto/evp/evp_key.h. Signature changed a bit to match Crypto++.
 int OPENSSL_EVP_BytesToKey(HashTransformation& hash,
-                           const unsigned char *salt, const unsigned char* data, int dlen,
+                           const unsigned char *salt, const unsigned char* data, size_t dlen,
                            unsigned int count, unsigned char *key, unsigned int ksize,
                            unsigned char *iv, unsigned int vsize)
 {

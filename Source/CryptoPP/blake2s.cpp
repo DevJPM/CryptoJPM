@@ -8,6 +8,8 @@
 #if CRYPTOPP_BOOL_CPP11_THREAD_SUPPORTED
 #include <thread>
 #endif
+
+#define DISABLE_SSE_LOCALLY
 // for testing purposes:
 // NOTE: to get test-vector compliant results enable the  following:
 //#define CRYPTOPP_BOOL_SSE2_INTRINSICS_AVAILABLE 0
@@ -212,7 +214,7 @@ void BLAKE2s::TruncatedFinal(byte *digest, size_t digestSize)
 
 void BLAKE2s::Compress(const byte* block)
 {
-#if CRYPTOPP_BOOL_SSE2_INTRINSICS_AVAILABLE
+#if CRYPTOPP_BOOL_SSE2_INTRINSICS_AVAILABLE && !defined(DISABLE_SSE_LOCALLY)
 if(HasSSSE3() && HasSSE2())
 {
 	__m128i row1, row2, row3, row4;
@@ -311,7 +313,7 @@ else
 
 #undef GREF
 #undef ROUNDREF
-#if CRYPTOPP_BOOL_SSE2_INTRINSICS_AVAILABLE
+#if CRYPTOPP_BOOL_SSE2_INTRINSICS_AVAILABLE && !defined(DISABLE_SSE_LOCALLY)
 }
 #endif
 }
@@ -410,7 +412,7 @@ void BLAKE2sMAC::TruncatedFinal(byte *digest, size_t digestSize)
 
 void BLAKE2sMAC::Compress(const byte* block)
 {
-#if CRYPTOPP_BOOL_SSE2_INTRINSICS_AVAILABLE
+#if CRYPTOPP_BOOL_SSE2_INTRINSICS_AVAILABLE && !defined(DISABLE_SSE_LOCALLY)
 if(HasSSSE3() && HasSSE2())
 {
 	__m128i row1, row2, row3, row4;
@@ -509,7 +511,7 @@ else
 
 #undef GREF
 #undef ROUNDREF
-#if CRYPTOPP_BOOL_SSE2_INTRINSICS_AVAILABLE
+#if CRYPTOPP_BOOL_SSE2_INTRINSICS_AVAILABLE && !defined(DISABLE_SSE_LOCALLY)
 }
 #endif
 }

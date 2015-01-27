@@ -385,7 +385,7 @@ void PEM_DH_Load(BufferedTransformation& bt, Integer& p, Integer& g)
         throw Exception(Exception::OTHER_ERROR, "PEM_DH_Read: p is not prime");
     
     // https://crypto.stackexchange.com/questions/12961/diffie-hellman-parameter-check-when-g-2-must-p-mod-24-11
-    long residue = p % 24;
+	long residue = p.ConvertToLong() % 24;
     if(residue != 11 && residue != 23)
         throw Exception(Exception::OTHER_ERROR, "PEM_DH_Read: g is not a suitable generator");
 #endif
@@ -417,7 +417,7 @@ void PEM_DH_Load(BufferedTransformation& bt, Integer& p, Integer& q, Integer& g)
         throw Exception(Exception::OTHER_ERROR, "PEM_DH_Read: p is not prime");
     
     // https://crypto.stackexchange.com/questions/12961/diffie-hellman-parameter-check-when-g-2-must-p-mod-24-11
-    long residue = p % 24;
+	long residue = p.ConvertToLong() % 24;
     if(residue != 11 && residue != 23)
         throw Exception(Exception::OTHER_ERROR, "PEM_DH_Read: g is not a suitable generator");
 #endif
@@ -594,7 +594,7 @@ void PEM_CipherForAlgorithm(const EncapsulatedHeader& header, const char* passwo
     //   {NULL,0} parameters are the OUT IV. However, the original IV in the PEM
     //   header is used; and not the derived IV.
     Weak::MD5 md5;
-    int ret = OPENSSL_EVP_BytesToKey(md5, _iv.data(), _pword, _plen, 1, _key.data(), _key.size(), NULL, 0);
+    int ret = OPENSSL_EVP_BytesToKey(md5, _iv.data(), _pword, _plen, 1, _key.data(), static_cast<unsigned int>(_key.size()), NULL, 0);
     if(ret != static_cast<int>(ksize))
         throw Exception(Exception::OTHER_ERROR, "PEM_CipherForAlgorithm: EVP_BytesToKey failed");
     
