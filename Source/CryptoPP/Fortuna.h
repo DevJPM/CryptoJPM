@@ -49,6 +49,7 @@ public:
 protected:
 	void IncorporateEntropySmall(const byte* Input,byte length,byte SourceNumber);
 	void Reseed(const byte* NewSeed,size_t seedlen);
+	void Initialize();
 	// manually take care that calls to GetPoolHash are thread-safe
 	virtual HashTransformation* GetPoolHash(byte i) =0;
 	// initializes a new instance of the cipher and returns it
@@ -76,11 +77,11 @@ template<class CIPHER,class RESEED_HASH,class POOL_HASH = RESEED_HASH>
 class Fortuna : public Fortuna_Base
 {
 public:
-	Fortuna():Fortuna_Base(){}
+	Fortuna():Fortuna_Base(){ Initialize(); }
 private:
 	POOL_HASH m_PoolHashes[NUM_POOLS];
 	HashTransformation* GetPoolHash(byte i) {if(i>=NUM_POOLS){throw(InvalidArgument("can not access a Fortuna-Pool beyond 32!"));}return m_PoolHashes[i];}
-	HashTransformation* GetReseedHash() {return new RESEED_HASH();}
+	HashTransformation* GetNewReseedHash() {return new RESEED_HASH();}
 	const typename CIPHER::Encryption m_InfoCipher;
 	BlockCipher* GetNewCipher() {return new typename CIPHER::Encryption();}
 	const BlockCipher* GetCipher() const {return &m_InfoCipher;}
@@ -129,7 +130,7 @@ public:
 private:
 	POOL_HASH m_PoolHashes[NUM_POOLS];
 	HashTransformation* GetPoolHash(byte i) {if(i>=NUM_POOLS){throw(InvalidArgument("can not access a Fortuna-Pool beyond 32!"));}return m_PoolHashes[i];}
-	HashTransformation* GetReseedHash() {return new RESEED_HASH();}
+	HashTransformation* GetNewReseedHash() {return new RESEED_HASH();}
 	const typename CIPHER::Encryption m_InfoCipher;
 	BlockCipher* GetNewCipher() {return new typename CIPHER::Encryption();}
 	const BlockCipher* GetCipher() const {return &m_InfoCipher;}
@@ -151,9 +152,9 @@ public:
 	virtual void GenerateBlock(byte *output, size_t size) {GetSingleton()->GenerateBlock(output,size);}
 	virtual void GenerateSeedFile(byte* output,size_t length) {GetSingleton()->GenerateSeedFile(output,length);}
 	// create a new seed file after you've used the old one
-	virtual void ReadSeedFile(const byte* input,size_t length) {GetSingleton()->ReadSeedFile(input,length)}
+	virtual void ReadSeedFile(const byte* input,size_t length) {GetSingleton()->ReadSeedFile(input,length);}
 private:
-	AutoSeededFortuna* GetSingleton() {return &Singleton<AutoSeededFortuna<CIPHER,RESEED_HASH,POOL_HASH>>().Ref();}
+	AutoSeededFortuna<CIPHER, RESEED_HASH, POOL_HASH>* GetSingleton() {return &Singleton<AutoSeededFortuna<CIPHER,RESEED_HASH,POOL_HASH>>().Ref();}
 };
 
 // use this typedef if you can't guarantee consistent template-parameters for AutoSeededFortunaSingleton
