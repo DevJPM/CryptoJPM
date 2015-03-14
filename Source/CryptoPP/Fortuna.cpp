@@ -2,10 +2,14 @@
 
 #include "pch.h"
 #include "Fortuna.h"
+#include "osrng.h"
 
+#ifdef CRYPTOPP_WIN32_AVAILABLE
+#include <Windows.h>
+#endif
 // compile-time switch:
 // OPTION1: give random data to one pool after each other
-// OPTION2: give random data to the pool with the index i = MD5(Data)%NUM_POOLS
+// OPTION2: give random data to the pool with the index i = SHA256(Data)%NUM_POOLS
 #define USE_RANDOMIZED_POOLING
 #define RANDOM_POOLING_HASH SHA256
 
@@ -18,10 +22,11 @@ m_ReseedCounter(0),
 m_PoolIndex(0),
 m_ReseedTimer(TimerBase::MILLISECONDS)
 {
+	memset(m_Key,0,m_Key.SizeInBytes());
+	memset(m_Counter,0,m_Key.SizeInBytes());
 	m_ReseedTimer.StartTimer();
 	for(byte i=0;i<NUM_POOLS;++i)
-		GetPoolHash(i).Restart();
-	GetReseedHash().Restart();
+		GetPoolHash(i)->Restart();
 }
 
 void Fortuna_Base::IncorporateEntropyEx(const byte* Input,size_t length,byte SourceNumber)
@@ -47,9 +52,14 @@ void Fortuna_Base::IncorporateEntropySmall(const byte* Input,byte length,byte So
 	if(!length || length>MAX_EVENT_SIZE)
 		throw(InvalidArgument("Event length was invalid"));
 
-	GetPoolHash(m_PoolIndex).Update(&SourceNumber,sizeof(SourceNumber));
-	GetPoolHash(m_PoolIndex).Update(&length,sizeof(length));
-	GetPoolHash(m_PoolIndex).Update(Input,length);
+#if CRYPTOPP_BOOL_CPP11_THREAD_SUPPORTED
+	std::lock_guard<std::recursive_mutex> Guard(m_PoolMutex[m_PoolIndex]);
+#endif
+
+	GetPoolHash(m_PoolIndex)->Update(&SourceNumber,sizeof(SourceNumber));
+	GetPoolHash(m_PoolIndex)->Update(&length,sizeof(length));
+	GetPoolHash(m_PoolIndex)->Update(Input,length);
+	m_PoolProcessedData[m_PoolIndex]+=length+sizeof(length)+sizeof(SourceNumber);
 
 #if defined(USE_RANDOMIZED_POOLING)
 	RANDOM_POOLING_HASH().CalculateTruncatedDigest(&m_PoolIndex,sizeof(m_PoolIndex),Input,length);
@@ -98,6 +108,10 @@ void Fortuna_Base::GenerateSmallBlock(byte* output,size_t size)
 	if(size > MaxGenerateSize())
 		throw(InvalidArgument("requested too much random data at once!"));
 	// reseed if neccessary
+#if CRYPTOPP_BOOL_CPP11_THREAD_SUPPORTED
+	{
+	std::lock_guard<std::recursive_mutex> GuardReseed(m_ReseedCounterMutex);
+#endif
 	if(m_PoolProcessedData[0]>=MIN_POOL_SIZE && (m_ReseedTimer.ElapsedTime()>=NUMBER_MILLISECONDS_BETWEEN_RESEEDS)) // check timing
 	{
 		m_ReseedCounter++;
@@ -109,18 +123,29 @@ void Fortuna_Base::GenerateSmallBlock(byte* output,size_t size)
 		{
 			if(m_ReseedCounter%(1ui64<<i)==0)
 			{
-				HarvestedData.Grow(HarvestedData.size()+GetPoolHash(0).DigestSize());
-				GetPoolHash(i).Final(&HarvestedData[HarvestedData.size()-GetPoolHash(0).DigestSize()]);
-				GetPoolHash(i).Restart();
+				HarvestedData.Grow(HarvestedData.size()+GetPoolHash(0)->DigestSize());
+#if CRYPTOPP_BOOL_CPP11_THREAD_SUPPORTED
+				std::lock_guard<std::recursive_mutex> Guard(m_PoolMutex[i]);
+#endif
+				GetPoolHash(i)->Final(&HarvestedData[HarvestedData.size()-GetPoolHash(0)->DigestSize()]);
+				GetPoolHash(i)->Restart();
 			}
 		}
 
 		Reseed(HarvestedData,HarvestedData.size());
 	}
-
+	else
+		if(m_ReseedCounter==0)
+			throw(InvalidState(AlgorithmName()));
 	// some entropy need to be available
-	if(m_ReseedCounter==0)
-		throw(InvalidState(AlgorithmName()));
+#if CRYPTOPP_BOOL_CPP11_THREAD_SUPPORTED
+	} // reseed mtx
+#endif
+	
+#if CRYPTOPP_BOOL_CPP11_THREAD_SUPPORTED
+	std::lock_guard<std::recursive_mutex> Guard(m_GeneratorMutex);
+#endif
+
 	// output data here
 	bool CounterIsAllZero=true;
 	for(size_t i=0;i<m_Counter.size();++i)
@@ -129,11 +154,14 @@ void Fortuna_Base::GenerateSmallBlock(byte* output,size_t size)
 	if(CounterIsAllZero)
 		throw(InvalidState(AlgorithmName()));
 
+	simple_ptr<BlockCipher> CipherInstance(GetNewCipher());
+	CipherInstance.m_p->SetKey(m_Key,m_Key.SizeInBytes());
+
 	while(size>0)
 	{
 		if(size>=GetCipher()->BlockSize())
 		{
-			GetCipher()->ProcessBlock(m_Counter,output);
+			CipherInstance.m_p->ProcessBlock(m_Counter,output);
 			IncrementCounterByOne(m_Counter,static_cast<unsigned int>(m_Counter.size()));
 			output+=GetCipher()->BlockSize();
 			size-=GetCipher()->BlockSize();
@@ -141,7 +169,7 @@ void Fortuna_Base::GenerateSmallBlock(byte* output,size_t size)
 		else // size < BLOCKSIZE
 		{
 			SecByteBlock Buffer(GetCipher()->BlockSize());
-			GetCipher()->ProcessBlock(m_Counter,Buffer);
+			CipherInstance.m_p->ProcessBlock(m_Counter,Buffer);
 			memcpy(output,Buffer,size);
 			IncrementCounterByOne(m_Counter,static_cast<unsigned int>(m_Counter.size()));
 			output+=size;
@@ -155,18 +183,18 @@ void Fortuna_Base::GenerateSmallBlock(byte* output,size_t size)
 	{
 		if((NewKey.size()-i)>=GetCipher()->BlockSize())
 		{
-			GetCipher()->ProcessBlock(m_Counter,NewKey);
+			CipherInstance.m_p->ProcessBlock(m_Counter,NewKey);
 			IncrementCounterByOne(m_Counter,static_cast<unsigned int>(m_Counter.size()));
 		}
 		else
 		{
 			SecByteBlock Buffer(GetCipher()->BlockSize());
-			GetCipher()->ProcessBlock(m_Counter,Buffer);
+			CipherInstance.m_p->ProcessBlock(m_Counter,Buffer);
 			memcpy(NewKey,Buffer,NewKey.size()-i);
 			IncrementCounterByOne(m_Counter,static_cast<unsigned int>(m_Counter.size()));
 		}
 	}
-	memcpy(m_Key,NewKey,GetCipher()->MaxKeyLength());
+	memcpy(m_Key,NewKey,m_Key.SizeInBytes());
 }
 
 void Fortuna_Base::Reseed(const byte* NewSeed,size_t seedlen)
@@ -174,13 +202,120 @@ void Fortuna_Base::Reseed(const byte* NewSeed,size_t seedlen)
 	if(!NewSeed && seedlen)
 		throw(InvalidArgument("invalid NULL pointer was passed"));
 
-	GetReseedHash().Restart();
-	GetReseedHash().Update(m_Key,m_Key.size());
-	GetReseedHash().Update(NewSeed,seedlen);
-	GetReseedHash().TruncatedFinal(m_Key,m_Key.size());
+	simple_ptr<HashTransformation> Reseeder(GetNewReseedHash());
+
+#if CRYPTOPP_BOOL_CPP11_THREAD_SUPPORTED
+	std::lock_guard<std::recursive_mutex> Guard(m_GeneratorMutex);
+#endif
+
+	Reseeder.m_p->Restart();
+	Reseeder.m_p->Update(m_Key,m_Key.size());
+	Reseeder.m_p->Update(NewSeed,seedlen);
+	Reseeder.m_p->TruncatedFinal(m_Key,m_Key.size());
 	IncrementCounterByOne(m_Counter,static_cast<unsigned int>(m_Counter.size()));
 
 	m_ReseedTimer.StartTimer();
+}
+
+AutoSeededFortuna_Base::AutoSeededFortuna_Base(bool AllowSlowPoll,bool AllowMultithreading) :
+#if CRYPTOPP_BOOL_CPP11_THREAD_SUPPORTED
+	m_PollAtCalltime(!AllowMultithreading)
+#else
+	m_PollAtCalltime(true)
+#endif
+{
+	// compile and run-time check
+	// put this in #if/#endif clause because some variables may otherwise be undefined
+#if CRYPTOPP_BOOL_CPP11_THREAD_SUPPORTED
+	if(m_PollAtCalltime)
+	{
+
+	}
+#endif
+}
+
+void AutoSeededFortuna_Base::GenerateSmallBlock(byte* output,size_t size)
+{
+	if(m_PollAtCalltime)
+		PollFast();
+	Fortuna_Base::GenerateSmallBlock(output,size);
+}
+
+void AutoSeededFortuna_Base::ReadSeedFile(const byte* input,size_t length)
+{
+	Fortuna_Base::ReadSeedFile(input,length);
+	GenerateMachineSignature();
+}
+
+static const enum StaticSourceIDs
+{
+	BASIC_SYSTEM_DATA,
+	SYSTEM_TIMING_DATA,
+	SYSTEM_RNG_DATA
+};
+
+#define ConvertToIntAndIncorporate(VALUE,ID) \
+	Buffer=(word32)(VALUE);\
+	IncorporateEntropyEx(reinterpret_cast<byte*>(&(Buffer)),sizeof(Buffer),ID)
+
+void AutoSeededFortuna_Base::PollFast()
+{
+#ifdef CRYPTOPP_WIN32_AVAILABLE
+	word32 Buffer;
+	POINT BufferPoint;
+	MEMORYSTATUS MemoryData;
+	ConvertToIntAndIncorporate(GetActiveWindow(),BASIC_SYSTEM_DATA);
+	ConvertToIntAndIncorporate(GetCapture(),BASIC_SYSTEM_DATA);
+	ConvertToIntAndIncorporate(GetClipboardOwner(),BASIC_SYSTEM_DATA);
+	ConvertToIntAndIncorporate(GetClipboardViewer(),BASIC_SYSTEM_DATA);
+	ConvertToIntAndIncorporate(GetCurrentProcess(),BASIC_SYSTEM_DATA);
+	ConvertToIntAndIncorporate(GetCurrentProcessId(),BASIC_SYSTEM_DATA);
+	ConvertToIntAndIncorporate(GetCurrentThread(),BASIC_SYSTEM_DATA);
+	ConvertToIntAndIncorporate(GetCurrentThreadId(),BASIC_SYSTEM_DATA);
+	ConvertToIntAndIncorporate(GetCurrentTime(),BASIC_SYSTEM_DATA);
+	ConvertToIntAndIncorporate(GetDesktopWindow(),BASIC_SYSTEM_DATA);
+	ConvertToIntAndIncorporate(GetFocus(),BASIC_SYSTEM_DATA);
+	ConvertToIntAndIncorporate(GetInputState(),BASIC_SYSTEM_DATA);
+	ConvertToIntAndIncorporate(GetMessagePos(),BASIC_SYSTEM_DATA);
+	ConvertToIntAndIncorporate(GetMessageTime(),BASIC_SYSTEM_DATA);
+	ConvertToIntAndIncorporate(GetOpenClipboardWindow(),BASIC_SYSTEM_DATA);
+	ConvertToIntAndIncorporate(GetProcessHeap(),BASIC_SYSTEM_DATA);
+	ConvertToIntAndIncorporate(GetProcessWindowStation(),BASIC_SYSTEM_DATA);
+	ConvertToIntAndIncorporate(GetQueueStatus(QS_ALLEVENTS),BASIC_SYSTEM_DATA);
+
+	GetCaretPos(&BufferPoint);
+	IncorporateEntropyEx((byte*)&BufferPoint,sizeof(POINT),BASIC_SYSTEM_DATA);
+	GetCursorPos(&BufferPoint);
+	IncorporateEntropyEx((byte*)&BufferPoint,sizeof(POINT),BASIC_SYSTEM_DATA);
+
+	MemoryData.dwLength=sizeof(MEMORYSTATUS);
+	GlobalMemoryStatus(&MemoryData);
+	IncorporateEntropyEx((byte*)&MemoryData,sizeof(MEMORYSTATUS),BASIC_SYSTEM_DATA);
+
+	FILETIME TimeBufferA,TimeBufferB,TimeBufferC,TimeBufferD;
+	HANDLE HandleBuffer = GetCurrentThread();
+	GetThreadTimes(HandleBuffer,&TimeBufferA,&TimeBufferB,&TimeBufferC,&TimeBufferD);
+	IncorporateEntropyEx((byte*)&TimeBufferA,sizeof(FILETIME),SYSTEM_TIMING_DATA);
+	IncorporateEntropyEx((byte*)&TimeBufferB,sizeof(FILETIME),SYSTEM_TIMING_DATA);
+	IncorporateEntropyEx((byte*)&TimeBufferC,sizeof(FILETIME),SYSTEM_TIMING_DATA);
+	IncorporateEntropyEx((byte*)&TimeBufferD,sizeof(FILETIME),SYSTEM_TIMING_DATA);
+	HandleBuffer = GetCurrentProcess();
+	GetProcessTimes(HandleBuffer,&TimeBufferA,&TimeBufferB,&TimeBufferC,&TimeBufferD);
+	IncorporateEntropyEx((byte*)&TimeBufferA,sizeof(FILETIME),SYSTEM_TIMING_DATA);
+	IncorporateEntropyEx((byte*)&TimeBufferB,sizeof(FILETIME),SYSTEM_TIMING_DATA);
+	IncorporateEntropyEx((byte*)&TimeBufferC,sizeof(FILETIME),SYSTEM_TIMING_DATA);
+	IncorporateEntropyEx((byte*)&TimeBufferD,sizeof(FILETIME),SYSTEM_TIMING_DATA);
+
+	// some times at the end...
+	LARGE_INTEGER PC;
+	if(QueryPerformanceCounter(&PC))
+		IncorporateEntropyEx((byte*)&PC,sizeof(LARGE_INTEGER),BASIC_SYSTEM_DATA);
+	else
+		ConvertToIntAndIncorporate(GetTickCount64(),BASIC_SYSTEM_DATA);
+#endif
+	SecByteBlock DataBuffer(256);
+	OS_GenerateRandomBlock(true,DataBuffer,256);
+	IncorporateEntropyEx(DataBuffer,256,SYSTEM_RNG_DATA);
 }
 
 NAMESPACE_END

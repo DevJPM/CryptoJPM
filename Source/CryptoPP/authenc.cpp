@@ -175,6 +175,43 @@ void AuthenticatedSymmetricCipherBase::TruncatedFinal(byte *mac, size_t macSize)
 	m_state = State_KeySet;
 }
 
+static const byte DerivationParamCipherIV[] = "CIPHER-IV";
+static const byte DerivationParamMACIV[] = "MAC-IV";
+static const byte DerivationParamCipherKey[] = "CIPHER-KEY";
+static const byte DerivationParamMACKey[] = "MAC-KEY";
+
+void EncryptThenAuthenticate_Base::Resync(const byte *iv, size_t len)
+{
+	if(len>(size_t(0)-1)/2)
+		throw(InvalidArgument("IV too large"));
+	SecByteBlock IV(2*len);
+	if(AccessMAC().IsResynchronizable()) // don't give the same IV to both
+	{
+		DeriveKey(IV,len,iv,len,DerivationParamCipherIV,9);
+		DeriveKey(IV+len,len,iv,len,DerivationParamMACIV,6);
+	}
+	else
+	{
+		memcpy_s(IV,len,iv,len);
+		memcpy_s(IV+len,len,iv,len);
+	}
+
+	// the cipher MUST BE RESYNCHRONIZABLE!
+	AccessSymmetricCipher().Resynchronize(IV,static_cast<int>(len));
+	if(AccessMAC().IsResynchronizable())
+		AccessMAC().Resynchronize(IV+len,static_cast<int>(len));
+}
+
+void EncryptThenAuthenticate_Base::SetKeyWithoutResync(const byte *userKey, size_t keylength, const NameValuePairs &params)
+{
+	SecByteBlock Keys(2*keylength);
+	// MAC-Key != CIPHER-KEY
+	DeriveKey(Keys,keylength,userKey,keylength,DerivationParamCipherKey,10);
+	DeriveKey(Keys+keylength,keylength,userKey,keylength,DerivationParamMACKey,7);
+	AccessMAC().SetKey(Keys,keylength,params);
+	AccessSymmetricCipher().SetKey(Keys+keylength,keylength,params);
+}
+
 NAMESPACE_END
 
 #endif

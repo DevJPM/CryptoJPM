@@ -351,6 +351,8 @@ NAMESPACE_END
 //#define CRYPTOPP_DISABLE_CPP11
 //use the following to keep C++11 support but disable call-internal multithreading
 //#define CRYPTOPP_DISABLE_INTERNAL_MULTITHREADING
+// thread support requires the following headers:
+// <thread>,<mutex>,<atomic>,<memory> with their classes: std::thread, std::mutex, std::atomic, std::shared_ptr (thread-safe)
 #if !defined(CRYPTOPP_DISABLE_INTERNAL_MULTITHREADING) && !defined(CRYPTOPP_DISABLE_CPP11) && ((_MSC_VER >= 1700) ) // list other compilers
 #define CRYPTOPP_BOOL_CPP11_THREAD_SUPPORTED 1
 #else
