@@ -81,6 +81,18 @@ protected:
 
 CRYPTOPP_DLL void CRYPTOPP_API OS_GenerateRandomBlock(bool blocking, byte *output, size_t size);
 
+// uses /dev/random-like or CryptGenRandom() like data  and (if available) uses RDRAND and RDSEED (-> extremely fast)
+CRYPTOPP_DLL void CRYPTOPP_API OS_GenerateRandomBlockFast(bool blocking, byte *output, size_t size);
+// uses OS specific counters, timers,... (-> quite fast)
+CRYPTOPP_DLL void CRYPTOPP_API OS_GenerateRandomBlockMedium(bool blocking, byte *output, size_t size);
+// uses network load, hdd latency, ... (-> very slow)
+CRYPTOPP_DLL void CRYPTOPP_API OS_GenerateRandomBlockSlow(bool blocking, byte *output, size_t size);
+
+// uses Intel's RDRAND instruction to generate random data, returns false on error
+CRYPTOPP_DLL bool CRYPTOPP_API GenerateRDRANDData( byte *output, size_t size);
+// uses Intel's RDSEED instruction to generate random data, returns false on error
+CRYPTOPP_DLL bool CRYPTOPP_API GenerateRDSEEDData( byte *output, size_t size);
+
 //! Automaticly Seeded Randomness Pool
 /*! This class seeds itself using an operating system provided RNG. */
 class CRYPTOPP_DLL AutoSeededRandomPool : public RandomPool

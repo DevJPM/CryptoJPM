@@ -113,6 +113,8 @@ bool ValidateAll(bool thorough)
 	pass=ValidateRabin() && pass;
 	pass=ValidateRW() && pass;
 //	pass=ValidateBlumGoldwasser() && pass;
+	pass=ValidateOIDtoECP() && pass;
+	pass=ValidateOIDtoEC2N() && pass;
 	pass=ValidateECP() && pass;
 	pass=ValidateEC2N() && pass;
 	pass=ValidateECDSA() && pass;

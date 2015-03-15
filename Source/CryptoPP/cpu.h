@@ -106,6 +106,8 @@ extern CRYPTOPP_DLL bool g_hasSSSE3;
 extern CRYPTOPP_DLL bool g_hasAESNI;
 extern CRYPTOPP_DLL bool g_hasCLMUL;
 extern CRYPTOPP_DLL bool g_isP4;
+extern CRYPTOPP_DLL bool g_hasRDRAND;
+extern CRYPTOPP_DLL bool g_hasRDSEED;
 extern CRYPTOPP_DLL word32 g_cacheLineSize;
 CRYPTOPP_DLL void CRYPTOPP_API DetectX86Features();
 CRYPTOPP_DLL bool CRYPTOPP_API CpuId(word32 input, word32 *output);
@@ -162,6 +164,20 @@ inline bool HasCLMUL()
 	if (!g_x86DetectionDone)
 		DetectX86Features();
 	return g_hasCLMUL;
+}
+
+inline bool HasRDRAND()
+{
+	if (!g_x86DetectionDone)
+		DetectX86Features();
+	return g_hasRDRAND;
+}
+
+inline bool HasRDSEED()
+{
+	if (!g_x86DetectionDone)
+		DetectX86Features();
+	return g_hasRDSEED;
 }
 
 inline bool IsP4()

@@ -3,6 +3,7 @@
 // Thanks to Leonard Janke for the suggestion for AutoSeededRandomPool.
 
 #include "pch.h"
+#include "cpu.h"
 
 #ifndef CRYPTOPP_IMPORTS
 
@@ -176,6 +177,118 @@ void OS_GenerateRandomBlock(bool blocking, byte *output, size_t size)
 		rng.GenerateBlock(output, size);
 #endif
 	}
+}
+
+inline byte RDRAND32 (word32 *seed);
+/*
+{
+	byte Success; // 1 means all good, 0 means retry
+
+	AS1( .byte 0x0f,0xc7,0xf0 )
+	AS1( setc %1 )
+
+	return Success;
+}*/
+
+inline byte RDSEED32 (word32 *seed);
+/*
+{
+	byte Success; // 1 means all good, 0 means retry
+
+	AS1(.byte 0x0f,0xc7,0xf8 )
+	AS1( setc %1 )
+
+	return Success;
+}*/
+
+bool GenerateRDRANDData(byte* output,size_t size)
+{
+	if(!HasRDRAND())
+		return false;
+
+	word32 Buffer;
+	byte AmountCopied=0;
+	while(size > 0)
+	{
+		if(RDRAND32(&Buffer)==0) // -> fail, try again
+			continue;
+		// write to output
+		if(size > sizeof(word32))
+		{
+			*((word32*)output)=Buffer;
+			AmountCopied=4;
+		}
+		else
+		{
+			memcpy_s(output,size,&Buffer,sizeof(word32));
+			AmountCopied=static_cast<byte>(size);
+		}
+		output += AmountCopied;
+		size -= AmountCopied;
+	}
+
+	return true;
+}
+bool GenerateRDSEEDData(byte* output,size_t size)
+{
+	if(!HasRDSEED() || !HasRDRAND())
+		return false;
+
+	word32 Buffer;
+	byte AmountCopied=0;
+	while(size > 0)
+	{
+		if(RDSEED32(&Buffer)==0) // -> fail, try again
+			continue;
+		// write to output
+		if(size > sizeof(word32))
+		{
+			*((word32*)output)=Buffer;
+			AmountCopied=4;
+		}
+		else
+		{
+			memcpy_s(output,size,&Buffer,sizeof(word32));
+			AmountCopied=static_cast<byte>(size);
+		}
+		output += AmountCopied;
+		size -= AmountCopied;
+	}
+
+	return true;
+}
+
+void OS_GenerateRandomBlockFast(bool blocking, byte* output, size_t size)
+{
+	byte NumSources = 1;
+	NumSources += (HasRDRAND())?(1):(0);
+	NumSources += (HasRDSEED())?(1):(0);
+
+	size_t NumBytesPerSource = size / NumSources;
+
+	if(HasRDRAND())
+	{
+		if(GenerateRDRANDData(output,NumBytesPerSource))
+		{
+			output += NumBytesPerSource;
+			size -= NumBytesPerSource;
+		}
+	}
+		
+	if(HasRDSEED()) // if this is available, then RDRAND must also be available
+	{
+		if(GenerateRDSEEDData(output,NumBytesPerSource))
+		{
+			output += NumBytesPerSource;
+			size -= NumBytesPerSource;
+		}
+	}
+	OS_GenerateRandomBlock(blocking,output,size);
+}
+
+void OS_GenerateRandomBlockMedium(bool blocking, byte* output, size_t size)
+{
+	
 }
 
 void AutoSeededRandomPool::Reseed(bool blocking, unsigned int seedSize)

@@ -160,6 +160,8 @@ void DetectX86Features()
 	g_hasSSSE3 = g_hasSSE2 && (cpuid1[2] & (1<<9));
 	g_hasAESNI = g_hasSSE2 && (cpuid1[2] & (1<<25));
 	g_hasCLMUL = g_hasSSE2 && (cpuid1[2] & (1<<1));
+	g_hasRDRAND = g_hasSSE2 && (cpuid[2] & (1<<30));
+	g_hasRDSEED = g_hasSSE2 && (cpuid[1] & (1<<18));
 
 	if ((cpuid1[3] & (1 << 25)) != 0)
 		g_hasISSE = true;

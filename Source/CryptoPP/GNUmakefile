@@ -1,4 +1,4 @@
-CXXFLAGS = -DNDEBUG -g -O2
+CXXFLAGS = -DNDEBUG -g2 -Os
 # -O3 fails to link on Cygwin GCC version 4.5.3
 # -fPIC is supported. Please report any breakage of -fPIC as a bug.
 CXXFLAGS += -fPIC
@@ -24,6 +24,11 @@ endif
 
 ifeq ($(CXX),gcc)	# for some reason CXX is gcc on cygwin 1.1.4
 CXX = g++
+endif
+
+GNU_LD216_OR_LATER = $(shell $(LD) -v 2>&1 | $(EGREP) -i -c '^gnu ld .* (2\.1[6-9]|2\.[2-9])')
+ifeq ($(GNU_LD216_OR_LATER),1)
+  LDFLAGS += -Wl,--exclude-libs,all
 endif
 
 ifeq ($(ISX86),1)
@@ -165,7 +170,7 @@ libcryptopp.a: $(LIBOBJS)
 	$(RANLIB) $@
 
 libcryptopp.so: $(LIBOBJS)
-	$(CXX) -shared -o $@ $(LIBOBJS)
+	$(CXX) -o $@ -shared $(CXXFLAGS) $(LDFLAGS) $(LIBOBJS)
 
 cryptest.exe: libcryptopp.a $(TESTOBJS)
 	$(CXX) -o $@ $(CXXFLAGS) $(TESTOBJS) ./libcryptopp.a $(LDFLAGS) $(LDLIBS)

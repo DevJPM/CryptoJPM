@@ -30,6 +30,9 @@
 
 #define GZIP_OS_CODE 0
 
+// define this to include elliptic curves that were present in the 1998 version of ANSI X9.62, but removed in 2005
+// #define CRYPTOPP_INCLUDE_X9_62_1998_CURVES
+
 // Try this if your CPU has 256K internal cache or a slow multiply instruction
 // and you want a (possibly) faster IDEA implementation using log tables
 // #define IDEA_LARGECACHE

@@ -3,6 +3,8 @@
 
 #include "filters.h"
 #include "queue.h"
+#include <iostream>
+#include <sstream>
 #include <vector>
 
 NAMESPACE_BEGIN(CryptoPP)
@@ -48,13 +50,6 @@ enum ASNIdFlag
 
 inline void BERDecodeError() {throw BERDecodeErr();}
 
-class CRYPTOPP_DLL UnknownOID : public BERDecodeErr
-{
-public:
-	UnknownOID() : BERDecodeErr("BER decode error: unknown object identifier") {}
-	UnknownOID(const char *err) : BERDecodeErr(err) {}
-};
-
 // unsigned int DERLengthEncode(unsigned int length, byte *output=0);
 CRYPTOPP_DLL size_t CRYPTOPP_API DERLengthEncode(BufferedTransformation &out, lword length);
 // returns false if indefinite length
@@ -88,6 +83,17 @@ public:
 
 	inline OID & operator+=(word32 rhs) {m_values.push_back(rhs); return *this;}
 
+	inline std::string str() const {
+		std::ostringstream os;
+		const size_t size = m_values.size();
+		for(size_t i = 0; i < size; i++) {
+			os << m_values[i];
+			if(i < size - 1)
+				os << ".";
+		}
+		return os.str();
+	}
+
 	void DEREncode(BufferedTransformation &bt) const;
 	void BERDecode(BufferedTransformation &bt);
 
@@ -99,6 +105,14 @@ public:
 private:
 	static void EncodeValue(BufferedTransformation &bt, word32 v);
 	static size_t DecodeValue(BufferedTransformation &bt, word32 &v);
+};
+
+class CRYPTOPP_DLL UnknownOID : public BERDecodeErr
+{
+public:
+	UnknownOID() : BERDecodeErr("BER decode error: unknown object identifier") {}
+	UnknownOID(const OID& oid) : BERDecodeErr("BER decode error: unknown object identifier " + oid.str()) {}
+	UnknownOID(const char *err) : BERDecodeErr(err) {}
 };
 
 class EncodedObjectFilter : public Filter
@@ -363,6 +377,12 @@ inline bool operator<(const ::CryptoPP::OID &lhs, const ::CryptoPP::OID &rhs)
 	{return std::lexicographical_compare(lhs.m_values.begin(), lhs.m_values.end(), rhs.m_values.begin(), rhs.m_values.end());}
 inline ::CryptoPP::OID operator+(const ::CryptoPP::OID &lhs, unsigned long rhs)
 	{return ::CryptoPP::OID(lhs)+=rhs;}
+
+inline std::ostream& operator<<(std::ostream& os, const ::CryptoPP::OID& oid)
+{
+	os << oid.str();
+	return os;
+}
 
 NAMESPACE_END
 

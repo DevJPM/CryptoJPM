@@ -71,6 +71,8 @@ bool ValidateXTR_DH();
 bool ValidateRabin();
 bool ValidateRW();
 //bool ValidateBlumGoldwasser();
+bool ValidateOIDtoECP();
+bool ValidateOIDtoEC2N();
 bool ValidateECP();
 bool ValidateEC2N();
 bool ValidateECDSA();

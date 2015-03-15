@@ -3,6 +3,9 @@
 
 // crypto-related ASN.1 object identifiers
 
+// WTLS from Table 8 at WAP/WTLS working group. Example: http://oid-info.com/get/2.23.43.1.4.1
+// http://technical.openmobilealliance.org/tech/affiliates/wap/wap-261-wtls-20010406-a.pdf
+
 #include "asn.h"
 
 NAMESPACE_BEGIN(CryptoPP)
@@ -27,6 +30,27 @@ DEFINE_OID(1, iso)
 				DEFINE_OID(ansi_x9_62()+2, id_publicKeyType)
 					DEFINE_OID(id_publicKeyType()+1, id_ecPublicKey)
 				DEFINE_OID(ansi_x9_62()+3, ansi_x9_62_curves)
+					DEFINE_OID(ansi_x9_62_curves()+0, ansi_x9_62_curves_two)
+						DEFINE_OID(ansi_x9_62_curves_two()+1, c2pnb163v1)
+						DEFINE_OID(ansi_x9_62_curves_two()+2, c2pnb163v2)
+						DEFINE_OID(ansi_x9_62_curves_two()+3, c2pnb163v3)
+						DEFINE_OID(ansi_x9_62_curves_two()+4, c2pnb176w1)
+						DEFINE_OID(ansi_x9_62_curves_two()+5, c2tnb191v1)
+						DEFINE_OID(ansi_x9_62_curves_two()+6, c2tnb191v2)
+						DEFINE_OID(ansi_x9_62_curves_two()+7, c2tnb191v3)
+						DEFINE_OID(ansi_x9_62_curves_two()+8, c2onb191v4)
+						DEFINE_OID(ansi_x9_62_curves_two()+9, c2onb191v5)
+						DEFINE_OID(ansi_x9_62_curves_two()+10, c2pnb208w1)
+						DEFINE_OID(ansi_x9_62_curves_two()+11, c2tnb239v1)
+						DEFINE_OID(ansi_x9_62_curves_two()+12, c2tnb239v2)
+						DEFINE_OID(ansi_x9_62_curves_two()+13, c2tnb239v3)
+						DEFINE_OID(ansi_x9_62_curves_two()+14, c2onb239v4)
+						DEFINE_OID(ansi_x9_62_curves_two()+15, c2onb239v5)
+						DEFINE_OID(ansi_x9_62_curves_two()+16, c2pnb272w1)
+						DEFINE_OID(ansi_x9_62_curves_two()+17, c2pnb304w1)
+						DEFINE_OID(ansi_x9_62_curves_two()+18, c2tnb359v1)
+						DEFINE_OID(ansi_x9_62_curves_two()+19, c2pnb368w1)
+						DEFINE_OID(ansi_x9_62_curves_two()+20, c2tnb431r1)
 					DEFINE_OID(ansi_x9_62_curves()+1, ansi_x9_62_curves_prime)
 						DEFINE_OID(ansi_x9_62_curves_prime()+1, secp192r1)
 						DEFINE_OID(ansi_x9_62_curves_prime()+7, secp256r1)
@@ -115,6 +139,23 @@ DEFINE_OID(2, joint_iso_ccitt)
 								DEFINE_OID(nist_hashalgs()+1, id_sha256)
 								DEFINE_OID(nist_hashalgs()+2, id_sha384)
 								DEFINE_OID(nist_hashalgs()+3, id_sha512)
+
+	DEFINE_OID(joint_iso_ccitt()+23, joint_iso_itu)
+			DEFINE_OID(joint_iso_itu()+43, wap)
+				DEFINE_OID(wap()+1, wap_wsg)
+					DEFINE_OID(wap_wsg()+4, wap_wsg_idm_ecid)
+						DEFINE_OID(wap_wsg_idm_ecid()+1, wtls1)
+						DEFINE_OID(wap_wsg_idm_ecid()+2, wtls2) // not assigned
+						DEFINE_OID(wap_wsg_idm_ecid()+3, wtls3) // sect163k1
+						DEFINE_OID(wap_wsg_idm_ecid()+4, wtls4) // sect113r1
+						DEFINE_OID(wap_wsg_idm_ecid()+5, wtls5) // c2pnb163v1
+						DEFINE_OID(wap_wsg_idm_ecid()+6, wtls6)
+						DEFINE_OID(wap_wsg_idm_ecid()+7, wtls7) // secp160r1
+						DEFINE_OID(wap_wsg_idm_ecid()+8, wtls8)
+						DEFINE_OID(wap_wsg_idm_ecid()+9, wtls9)
+						DEFINE_OID(wap_wsg_idm_ecid()+10, wtls10) // sect233k1
+						DEFINE_OID(wap_wsg_idm_ecid()+11, wtls11) // sect233r1
+						DEFINE_OID(wap_wsg_idm_ecid()+12, wtls12) // secp224r1
 
 NAMESPACE_END
 
