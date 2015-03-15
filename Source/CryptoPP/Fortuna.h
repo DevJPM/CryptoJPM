@@ -87,7 +87,7 @@ private:
 	const BlockCipher* GetCipher() const {return &m_InfoCipher;}
 };
 
-// the original scrypt as specified by Schneier, Fergueson and Kohno
+// the original Fortuna as specified by Schneier, Fergueson and Kohno
 typedef Fortuna<AES,SHA256> OriginalFortuna;
 
 //! autoseeded version of Fortuna, isn't located in osrng.h because it's much more complex than implementations there
