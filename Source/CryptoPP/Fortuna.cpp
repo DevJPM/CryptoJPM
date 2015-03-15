@@ -46,8 +46,6 @@ void Fortuna_Base::IncorporateEntropyEx(const byte* Input,size_t length,byte Sou
 	if(length)
 	{
 		IncorporateEntropySmall(Input,static_cast<byte>(length),SourceNumber);
-		Input+=length;
-		length-=length;
 	}
 }
 
@@ -103,8 +101,7 @@ void Fortuna_Base::GenerateBlock(byte* output,size_t size)
 		else // size < MaxGenerateSize
 		{
 			GenerateSmallBlock(output,size);
-			output += size;
-			size -= size;
+			size=0;
 		}
 	}
 }
@@ -129,12 +126,17 @@ void Fortuna_Base::GenerateSmallBlock(byte* output,size_t size)
 		{
 			if(m_ReseedCounter%(1ull<<i)==0)
 			{
-				HarvestedData.Grow(HarvestedData.size()+GetPoolHash(0)->DigestSize());
+				HarvestedData.Grow(HarvestedData.size()+GetPoolHash(i)->DigestSize());
 #if CRYPTOPP_BOOL_CPP11_THREAD_SUPPORTED
 				std::lock_guard<std::recursive_mutex> Guard(m_PoolMutex[i]);
 #endif
-				GetPoolHash(i)->Final(&HarvestedData[HarvestedData.size()-GetPoolHash(0)->DigestSize()]);
+				GetPoolHash(i)->Final(&HarvestedData[HarvestedData.size()-GetPoolHash(i)->DigestSize()]);
 				GetPoolHash(i)->Restart();
+			}
+			else
+			{
+				// if m_ReseedCounter%(1ull<i)!=0 then m_ReseedCounter%(1ull<j)!=0 for any j: j>i
+				break;
 			}
 		}
 
@@ -178,8 +180,7 @@ void Fortuna_Base::GenerateSmallBlock(byte* output,size_t size)
 			CipherInstance.m_p->ProcessBlock(m_Counter,Buffer);
 			memcpy(output,Buffer,size);
 			IncrementCounterByOne(m_Counter,static_cast<unsigned int>(m_Counter.size()));
-			output+=size;
-			size-=size;
+			size=0;
 		}
 	}
 
