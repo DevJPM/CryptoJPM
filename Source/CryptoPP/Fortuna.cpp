@@ -16,12 +16,18 @@
 NAMESPACE_BEGIN(CryptoPP)
 
 Fortuna_Base::Fortuna_Base() :
-m_Key(GetCipher()->MaxKeyLength()),
-m_Counter(GetCipher()->BlockSize()),
+m_Key(0),
+m_Counter(0),
 m_ReseedCounter(0),
 m_PoolIndex(0),
 m_ReseedTimer(TimerBase::MILLISECONDS)
 {
+}
+
+void Fortuna_Base::Initialize()
+{
+	m_Key.resize(GetCipher()->MaxKeyLength()),
+	m_Counter.resize(GetCipher()->BlockSize()),
 	memset(m_Key,0,m_Key.SizeInBytes());
 	memset(m_Counter,0,m_Key.SizeInBytes());
 	m_ReseedTimer.StartTimer();
@@ -75,9 +81,9 @@ size_t Fortuna_Base::MaxGenerateSize() const
 	if(GetCipher()->BlockSize()>=sizeof(size_t)) // triggers for BLOCKSIZE >= 64 (x64)
 		return size_t(0)-1;
 	// check for overflow
-	if((1ui64<<(GetCipher()->BlockSize())*GetCipher()->BlockSize())<(1ui64<<(GetCipher()->BlockSize()))) // triggers for ~63 bit
+	if((1ull<<(GetCipher()->BlockSize())*GetCipher()->BlockSize())<(1ull<<(GetCipher()->BlockSize()))) // triggers for ~63 bit
 		return size_t(0)-1;
-	return 1ui64<<(GetCipher()->BlockSize())*GetCipher()->BlockSize(); // triggers most of the time
+	return 1ull<<(GetCipher()->BlockSize())*GetCipher()->BlockSize(); // triggers most of the time
 }
 
 void Fortuna_Base::GenerateBlock(byte* output,size_t size)
@@ -121,7 +127,7 @@ void Fortuna_Base::GenerateSmallBlock(byte* output,size_t size)
 
 		for(byte i=0;i<NUM_POOLS;++i)
 		{
-			if(m_ReseedCounter%(1ui64<<i)==0)
+			if(m_ReseedCounter%(1ull<<i)==0)
 			{
 				HarvestedData.Grow(HarvestedData.size()+GetPoolHash(0)->DigestSize());
 #if CRYPTOPP_BOOL_CPP11_THREAD_SUPPORTED
@@ -224,6 +230,7 @@ AutoSeededFortuna_Base::AutoSeededFortuna_Base(bool AllowSlowPoll,bool AllowMult
 	m_PollAtCalltime(true)
 #endif
 {
+	Initialize();
 	// compile and run-time check
 	// put this in #if/#endif clause because some variables may otherwise be undefined
 #if CRYPTOPP_BOOL_CPP11_THREAD_SUPPORTED
@@ -247,7 +254,7 @@ void AutoSeededFortuna_Base::ReadSeedFile(const byte* input,size_t length)
 	GenerateMachineSignature();
 }
 
-static const enum StaticSourceIDs
+enum StaticSourceIDs
 {
 	BASIC_SYSTEM_DATA,
 	SYSTEM_TIMING_DATA,
