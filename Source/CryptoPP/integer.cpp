@@ -2817,13 +2817,34 @@ signed long Integer::ConvertToLong() const
 	return sign==POSITIVE ? value : -(signed long)value;
 }
 
-Integer::Integer(BufferedTransformation &encodedInteger, size_t byteCount, Signedness s)
+Integer::Integer(BufferedTransformation &encodedInteger, size_t byteCount, Signedness s, ByteOrder o)
 {
+	assert(o == BIG_ENDIAN_ORDER || o == LITTLE_ENDIAN_ORDER);
+    
+	if(o == LITTLE_ENDIAN_ORDER)
+	{
+		SecByteBlock block(byteCount);
+		encodedInteger.Get(block, block.size());
+		std::reverse(block.begin(), block.begin()+block.size());
+
+		Decode(block.begin(), block.size(), s);
+		return;
+	}
 	Decode(encodedInteger, byteCount, s);
 }
 
-Integer::Integer(const byte *encodedInteger, size_t byteCount, Signedness s)
+Integer::Integer(const byte *encodedInteger, size_t byteCount, Signedness s, ByteOrder o)
 {
+	assert(o == BIG_ENDIAN_ORDER || o == LITTLE_ENDIAN_ORDER);
+    
+	if(o == LITTLE_ENDIAN_ORDER)
+	{
+		SecByteBlock block(byteCount);
+		std::reverse_copy(encodedInteger, encodedInteger+byteCount, block.begin());
+        
+		Decode(block.begin(), block.size(), s);
+		return;
+	}
 	Decode(encodedInteger, byteCount, s);
 }
 
@@ -2965,18 +2986,20 @@ Integer::Integer(word value, size_t length)
 }
 
 template <class T>
-static Integer StringToInteger(const T *str)
+static Integer StringToInteger(const T *str, ByteOrder order)
 {
-	int radix;
+	assert(order == LITTLE_ENDIAN_ORDER || order == BIG_ENDIAN_ORDER);
+
 	// GCC workaround
 	// std::char_traits<wchar_t>::length() not defined in GCC 3.2 and STLport 4.5.3
 	unsigned int length;
 	for (length = 0; str[length] != 0; length++) {}
 
-	Integer v;
-
 	if (length == 0)
-		return v;
+		return Integer::Zero();
+
+	Integer v;
+	int radix, sign = 1;
 
 	switch (str[length-1])
 	{
@@ -2995,11 +3018,70 @@ static Integer StringToInteger(const T *str)
 	default:
 		radix=10;
 	}
+   
+	// 'str' is of length 1 or more
+	if (str[0] == '-')
+	{
+		sign = -1;
+		str += 1;
+		length -= 1;
+	}
+ 
+	if (length > 2 && str[0] == '0' && (str[1] == 'x' || str[1] == 'X'))
+	{
+ 		radix = 16;
+		str += 2;
+		length -= 2;
+	}
+    
+	SecBlock<T> block(length + 1);
+	if(order == LITTLE_ENDIAN_ORDER)
+	{
+		// All of these gyrations are because we need to handle the hexadecimal
+		//   case of 0xFF1. Its interpreted as FF:01, so we need to insert the 0
+		//   in the proper place when treating it as little endian. The copy_if
+		//   is used to filter out non-digits so we can get a good length to
+		//   perform the insert, if needed.
+		const T* begin = str;
+		const T* end = str + length;
+		T* res;
+        
+		if(radix == 16)
+			res = copy_if(begin, end, block.begin(), is_hexadecimal());
+		else if(radix == 10)
+			res = copy_if(begin, end, block.begin(), is_decimal());
+		else if(radix == 8)
+			res = copy_if(begin, end, block.begin(), is_octal());
+		else if(radix == 2)
+			res = copy_if(begin, end, block.begin(), is_binary());
+		else
+			res = std::copy(begin, end, block.begin());
+        
+		size_t size = std::distance(block.begin(), res);
+		if((radix == 16) && (size % 2 != 0))
+		{
+			// block is 'length+1', so we have an extra byte if needed.
+			block[size] = block[size - 1];
+			block[size - 1] = '0';
+			size++;
+		}
+        
+		block.resize(size);
+		std::reverse(block.begin(), block.begin()+block.size());
+        
+		if(radix == 16)
+		{
+			// In the case of hexadecimal, we really needed to move
+			//   character pairs. This corrects the byte swapping.
+			for(unsigned int i = 0; i+1 < block.size(); i+=2)
+				std::swap(block[i], block[i+1]);
+		}
+        
+		str = block.begin();
+		length = block.size();
+	}
 
-	if (length > 2 && str[0] == '0' && str[1] == 'x')
-		radix = 16;
-
-	for (unsigned i=0; i<length; i++)
+	for (unsigned int i=0; i<length; i++)
 	{
 		int digit;
 
@@ -3019,22 +3101,22 @@ static Integer StringToInteger(const T *str)
 		}
 	}
 
-	if (str[0] == '-')
+	if (sign == -1)
 		v.Negate();
 
 	return v;
 }
 
-Integer::Integer(const char *str)
+Integer::Integer(const char *str, ByteOrder order)
 	: reg(2), sign(POSITIVE)
 {
-	*this = StringToInteger(str);
+	*this = StringToInteger(str,order);
 }
 
-Integer::Integer(const wchar_t *str)
+Integer::Integer(const wchar_t *str, ByteOrder order)
 	: reg(2), sign(POSITIVE)
 {
-	*this = StringToInteger(str);
+	*this = StringToInteger(str,order);
 }
 
 unsigned int Integer::WordCount() const
@@ -3421,13 +3503,19 @@ std::ostream& operator<<(std::ostream& out, const Integer &a)
 	while (i--)
 	{
 		out << s[i];
-//		if (i && !(i%block))
-//			out << ",";
-	}
-#if defined(CRYPTOPP_NO_INTEGER_SUFFIX)
+		// if (i && !(i%block))
+		// 	out << ",";
+ 	}
+    
+#ifdef CRYPTOPP_NO_INTEGER_SUFFIX
+	return out;
+#elif CRYPTOPP_USE_IOS_SHOWBASE
+	if(out.flags() & std::ios_base::showbase)
+		out << suffix;
+        
 	return out;
 #else
-	return out << suffix;
+ 	return out << suffix;
 #endif
 }
 

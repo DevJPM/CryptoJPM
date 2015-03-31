@@ -175,7 +175,7 @@ void Fortuna_Base::GenerateSmallBlock(byte* output,size_t size)
 		if(size>=GetCipher()->BlockSize())
 		{
 			CipherInstance.m_p->ProcessBlock(m_Counter,output);
-			IncrementCounterByOne(m_Counter,static_cast<unsigned int>(m_Counter.size()));
+			IncrementCounterByOneLE(m_Counter,static_cast<unsigned int>(m_Counter.size()));
 			output+=GetCipher()->BlockSize();
 			size-=GetCipher()->BlockSize();
 		}
@@ -184,7 +184,7 @@ void Fortuna_Base::GenerateSmallBlock(byte* output,size_t size)
 			SecByteBlock Buffer(GetCipher()->BlockSize());
 			CipherInstance.m_p->ProcessBlock(m_Counter,Buffer);
 			memcpy(output,Buffer,size);
-			IncrementCounterByOne(m_Counter,static_cast<unsigned int>(m_Counter.size()));
+			IncrementCounterByOneLE(m_Counter,static_cast<unsigned int>(m_Counter.size()));
 			size=0;
 		}
 	}
@@ -196,14 +196,14 @@ void Fortuna_Base::GenerateSmallBlock(byte* output,size_t size)
 		if((NewKey.size()-i)>=GetCipher()->BlockSize())
 		{
 			CipherInstance.m_p->ProcessBlock(m_Counter,NewKey+i);
-			IncrementCounterByOne(m_Counter,static_cast<unsigned int>(m_Counter.size()));
+			IncrementCounterByOneLE(m_Counter,static_cast<unsigned int>(m_Counter.size()));
 		}
 		else
 		{
 			SecByteBlock Buffer(GetCipher()->BlockSize());
 			CipherInstance.m_p->ProcessBlock(m_Counter,Buffer);
 			memcpy(NewKey+i,Buffer,NewKey.size()-i);
-			IncrementCounterByOne(m_Counter,static_cast<unsigned int>(m_Counter.size()));
+			IncrementCounterByOneLE(m_Counter,static_cast<unsigned int>(m_Counter.size()));
 		}
 	}
 	memcpy(m_Key,NewKey,m_Key.SizeInBytes());
@@ -224,7 +224,7 @@ void Fortuna_Base::Reseed(const byte* NewSeed,size_t seedlen)
 	Reseeder.m_p->Update(m_Key,m_Key.size());
 	Reseeder.m_p->Update(NewSeed,seedlen);
 	Reseeder.m_p->TruncatedFinal(m_Key,m_Key.size());
-	IncrementCounterByOne(m_Counter,static_cast<unsigned int>(m_Counter.size()));
+	IncrementCounterByOneLE(m_Counter,static_cast<unsigned int>(m_Counter.size()));
 
 	m_ReseedTimer.StartTimer();
 }

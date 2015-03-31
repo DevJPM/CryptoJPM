@@ -1421,6 +1421,7 @@ echo: &gt;&gt; adhoc.cpp.copied
     <ClInclude Include="des.h" />
     <ClInclude Include="dh.h" />
     <ClInclude Include="dh2.h" />
+    <ClInclude Include="dhash.h" />
     <ClInclude Include="dmac.h" />
     <ClInclude Include="dsa.h" />
     <ClInclude Include="eax.h" />

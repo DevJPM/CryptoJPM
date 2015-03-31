@@ -81,14 +81,14 @@ public:
 		/*! str can be in base 2, 8, 10, or 16.  Base is determined by a
 			case insensitive suffix of 'h', 'o', or 'b'.  No suffix means base 10.
 		*/
-		explicit Integer(const char *str);
-		explicit Integer(const wchar_t *str);
+		explicit Integer(const char *str, ByteOrder order = BIG_ENDIAN_ORDER);
+		explicit Integer(const wchar_t *str, ByteOrder order = BIG_ENDIAN_ORDER);
 
 		//! convert from big-endian byte array
-		Integer(const byte *encodedInteger, size_t byteCount, Signedness s=UNSIGNED);
+		Integer(const byte *encodedInteger, size_t byteCount, Signedness s=UNSIGNED, ByteOrder o=BIG_ENDIAN_ORDER);
 
 		//! convert from big-endian form stored in a BufferedTransformation
-		Integer(BufferedTransformation &bt, size_t byteCount, Signedness s=UNSIGNED);
+		Integer(BufferedTransformation &bt, size_t byteCount, Signedness s=UNSIGNED, ByteOrder o=BIG_ENDIAN_ORDER);
 
 		//! convert from BER encoded byte array stored in a BufferedTransformation object
 		explicit Integer(BufferedTransformation &bt);

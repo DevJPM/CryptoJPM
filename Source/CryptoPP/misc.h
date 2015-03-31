@@ -4,6 +4,8 @@
 #include "cryptlib.h"
 #include "smartptr.h"
 #include <string.h>		// for memcpy and memmove
+#include <algorithm>
+#include <cctype>
 
 #ifdef _MSC_VER
 	#if _MSC_VER >= 1400
@@ -61,6 +63,59 @@ struct CompileAssert
 #define CRYPTOPP_DO_ASSERT_JOIN(X, Y) X##Y
 
 // ************** misc classes ***************
+
+// C++03 is missing copy_if
+template <class InputIterator, class OutputIterator, class Predicate>
+OutputIterator copy_if(InputIterator first, InputIterator last, OutputIterator result, Predicate pred)
+{
+	while(first!=last)
+	{
+		if(pred(*first))
+			*result++ = *first;
+		++first;
+	}
+	return result;
+}
+
+struct is_binary //predicate
+{
+    bool operator()(int val) const {return val >= '0' && val <= '1';}
+};
+
+struct not_binary //predicate
+{
+    bool operator()(int val) const {return !is_binary()(val);}
+};
+
+struct is_octal //predicate
+{
+    bool operator()(int val) const {return val >= '0' && val <= '8';}
+};
+
+struct not_octal //predicate
+{
+    bool operator()(int val) const {return !is_octal()(val);}
+};
+
+struct is_decimal //predicate
+{
+    bool operator()(int val) const {return std::isdigit(val)!=0;}
+};
+
+struct not_decimal //predicate
+{
+    bool operator()(int val) const {return !std::isdigit(val);}
+};
+
+struct is_hexadecimal //predicate
+{
+    bool operator()(int val) const {return std::isxdigit(val)!=0;}
+};
+
+struct not_hexadecimal //predicate
+{
+    bool operator()(int val) const {return !std::isxdigit(val);}
+};
 
 class CRYPTOPP_DLL Empty
 {
@@ -448,12 +503,26 @@ inline void IncrementCounterByOne(byte *inout, unsigned int s)
 		carry = !++inout[i];
 }
 
+inline void IncrementCounterByOneLE(byte *inout, unsigned int s) // same as IncrementCounterByOne, but with little-endian style
+{
+	for (unsigned int i=0, carry=1; i<s && carry; i++)
+		carry = !++inout[i];
+}
+
 inline void IncrementCounterByOne(byte *output, const byte *input, unsigned int s)
 {
 	int i, carry;
 	for (i=s-1, carry=1; i>=0 && carry; i--)
 		carry = ((output[i] = input[i]+1) == 0);
 	memcpy_s(output, s, input, i+1);
+}
+
+inline void IncrementCounterByOneLE(byte *output, const byte *input, unsigned int s) // same as IncrementCounterByOne, but with little-endian style
+{
+	unsigned int i, carry;
+	for (i=0, carry=1; i<s && carry; i++)
+		carry = ((output[i] = input[i]+1) == 0);
+	memcpy_s(output, s, input+i+1, s-i-1);
 }
 
 template <class T>

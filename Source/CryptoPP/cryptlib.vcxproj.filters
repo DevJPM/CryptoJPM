@@ -840,6 +840,9 @@
     <ClInclude Include="Fortuna.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="dhash.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Text Include="License.txt">

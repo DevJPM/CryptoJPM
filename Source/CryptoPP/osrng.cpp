@@ -3,6 +3,7 @@
 // Thanks to Leonard Janke for the suggestion for AutoSeededRandomPool.
 
 #include "pch.h"
+#include <immintrin.h>
 #include "cpu.h"
 
 #ifndef CRYPTOPP_IMPORTS
@@ -179,48 +180,35 @@ void OS_GenerateRandomBlock(bool blocking, byte *output, size_t size)
 	}
 }
 
-inline byte RDRAND32 (word32 *seed);
-/*
-{
-	byte Success; // 1 means all good, 0 means retry
-
-	AS1( .byte 0x0f,0xc7,0xf0 )
-	AS1( setc %1 )
-
-	return Success;
-}*/
-
-inline byte RDSEED32 (word32 *seed);
-/*
-{
-	byte Success; // 1 means all good, 0 means retry
-
-	AS1(.byte 0x0f,0xc7,0xf8 )
-	AS1( setc %1 )
-
-	return Success;
-}*/
+#define HAS_RDRAND_INTRINSIC_COMPILER_SUPPORT (_MSC_VER>=1700)
+#define HAS_RDSEED_INTRINSIC_COMPILER_SUPPORT (_MSC_VER>=1800)
 
 bool GenerateRDRANDData(byte* output,size_t size)
 {
+#if (CRYPTOPP_BOOL_X64 || CRYPTOPP_BOOL_X86) && HAS_RDRAND_INTRINSIC_COMPILER_SUPPORT
 	if(!HasRDRAND())
 		return false;
 
-	word32 Buffer;
+	word Buffer;
 	byte AmountCopied=0;
 	while(size > 0)
 	{
-		if(RDRAND32(&Buffer)==0) // -> fail, try again
+#if CRYPTOPP_BOOL_X64
+		if(_rdrand64_step(&Buffer)==0) // -> fail, try again
 			continue;
+#else
+		if(_rdrand32_step(&Buffer)==0) // -> fail, try again
+			continue;
+#endif
 		// write to output
-		if(size > sizeof(word32))
+		if(size > WORD_SIZE)
 		{
-			*((word32*)output)=Buffer;
+			*((word*)output)=Buffer;
 			AmountCopied=4;
 		}
 		else
 		{
-			memcpy_s(output,size,&Buffer,sizeof(word32));
+			memcpy_s(output,size,&Buffer,WORD_SIZE);
 			AmountCopied=static_cast<byte>(size);
 		}
 		output += AmountCopied;
@@ -228,27 +216,36 @@ bool GenerateRDRANDData(byte* output,size_t size)
 	}
 
 	return true;
+#else
+	return false;
+#endif
 }
 bool GenerateRDSEEDData(byte* output,size_t size)
 {
+#if (CRYPTOPP_BOOL_X64 || CRYPTOPP_BOOL_X86) && HAS_RDSEED_INTRINSIC_COMPILER_SUPPORT
 	if(!HasRDSEED() || !HasRDRAND())
 		return false;
 
-	word32 Buffer;
+	word Buffer;
 	byte AmountCopied=0;
 	while(size > 0)
 	{
-		if(RDSEED32(&Buffer)==0) // -> fail, try again
+#if CRYPTOPP_BOOL_X64
+		if(_rdseed64_step(&Buffer)==0) // -> fail, try again
 			continue;
+#else
+		if(_rdseed32_step(&Buffer)==0) // -> fail, try again
+			continue;
+#endif
 		// write to output
-		if(size > sizeof(word32))
+		if(size > WORD_SIZE)
 		{
-			*((word32*)output)=Buffer;
+			*((word*)output)=Buffer;
 			AmountCopied=4;
 		}
 		else
 		{
-			memcpy_s(output,size,&Buffer,sizeof(word32));
+			memcpy_s(output,size,&Buffer,WORD_SIZE);
 			AmountCopied=static_cast<byte>(size);
 		}
 		output += AmountCopied;
@@ -256,6 +253,9 @@ bool GenerateRDSEEDData(byte* output,size_t size)
 	}
 
 	return true;
+#else
+	return false;
+#endif
 }
 
 void OS_GenerateRandomBlockFast(bool blocking, byte* output, size_t size)
