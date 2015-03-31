@@ -8,6 +8,7 @@
 #include "aes.h"
 #include "sha.h"
 #include "sha3.h"
+#include "dhash.h"
 #include "hrtimer.h"
 #include "misc.h"
 #include "config.h"
@@ -80,7 +81,7 @@ public:
 	Fortuna():Fortuna_Base(){ Initialize(); }
 private:
 	POOL_HASH m_PoolHashes[NUM_POOLS];
-	HashTransformation* GetPoolHash(byte i) {if(i>=NUM_POOLS){throw(InvalidArgument("can not access a Fortuna-Pool beyond 32!"));}return m_PoolHashes[i];}
+	HashTransformation* GetPoolHash(byte i) {if(i>=NUM_POOLS){throw(InvalidArgument("can not access a Fortuna-Pool beyond 32!"));}return &m_PoolHashes[i];}
 	HashTransformation* GetNewReseedHash() {return new RESEED_HASH();}
 	const typename CIPHER::Encryption m_InfoCipher;
 	BlockCipher* GetNewCipher() {return new typename CIPHER::Encryption();}
@@ -88,7 +89,7 @@ private:
 };
 
 // the original Fortuna as specified by Schneier, Fergueson and Kohno
-typedef Fortuna<AES,SHA256> OriginalFortuna;
+typedef Fortuna<AES,DoubledHash<SHA256> > OriginalFortuna;
 
 //! autoseeded version of Fortuna, isn't located in osrng.h because it's much more complex than implementations there
 class CRYPTOPP_NO_VTABLE AutoSeededFortuna_Base : public Fortuna_Base
@@ -154,7 +155,7 @@ public:
 	// create a new seed file after you've used the old one
 	virtual void ReadSeedFile(const byte* input,size_t length) {GetSingleton()->ReadSeedFile(input,length);}
 private:
-	AutoSeededFortuna<CIPHER, RESEED_HASH, POOL_HASH>* GetSingleton() {return &Singleton<AutoSeededFortuna<CIPHER,RESEED_HASH,POOL_HASH>>().Ref();}
+	AutoSeededFortuna<CIPHER, RESEED_HASH, POOL_HASH>* GetSingleton() {return &Singleton<AutoSeededFortuna<CIPHER,RESEED_HASH,POOL_HASH> >().Ref();}
 };
 
 // use this typedef if you can't guarantee consistent template-parameters for AutoSeededFortunaSingleton

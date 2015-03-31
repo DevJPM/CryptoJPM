@@ -10,8 +10,8 @@
 // compile-time switch:
 // OPTION1: give random data to one pool after each other
 // OPTION2: give random data to the pool with the index i = SHA256(Data)%NUM_POOLS
-#define USE_RANDOMIZED_POOLING
-#define RANDOM_POOLING_HASH SHA256
+// #define USE_RANDOMIZED_POOLING
+// #define RANDOM_POOLING_HASH SHA256
 
 NAMESPACE_BEGIN(CryptoPP)
 
@@ -29,7 +29,7 @@ void Fortuna_Base::Initialize()
 	m_Key.resize(GetCipher()->MaxKeyLength()),
 	m_Counter.resize(GetCipher()->BlockSize()),
 	memset(m_Key,0,m_Key.SizeInBytes());
-	memset(m_Counter,0,m_Key.SizeInBytes());
+	memset(m_Counter,0,m_Counter.SizeInBytes());
 	m_ReseedTimer.StartTimer();
 	for(byte i=0;i<NUM_POOLS;++i)
 		GetPoolHash(i)->Restart();
@@ -115,7 +115,8 @@ void Fortuna_Base::GenerateSmallBlock(byte* output,size_t size)
 	{
 	std::lock_guard<std::recursive_mutex> GuardReseed(m_ReseedCounterMutex);
 #endif
-	if(m_PoolProcessedData[0]>=MIN_POOL_SIZE && (m_ReseedTimer.ElapsedTime()>=NUMBER_MILLISECONDS_BETWEEN_RESEEDS)) // check timing
+	if(m_PoolProcessedData[0]>=MIN_POOL_SIZE
+		&& (m_ReseedCounter==0 || m_ReseedTimer.ElapsedTime()>=NUMBER_MILLISECONDS_BETWEEN_RESEEDS)) // check timing
 	{
 		m_ReseedCounter++;
 
@@ -149,7 +150,6 @@ void Fortuna_Base::GenerateSmallBlock(byte* output,size_t size)
 #if CRYPTOPP_BOOL_CPP11_THREAD_SUPPORTED
 	} // reseed mtx
 #endif
-	
 #if CRYPTOPP_BOOL_CPP11_THREAD_SUPPORTED
 	std::lock_guard<std::recursive_mutex> Guard(m_GeneratorMutex);
 #endif
@@ -157,8 +157,13 @@ void Fortuna_Base::GenerateSmallBlock(byte* output,size_t size)
 	// output data here
 	bool CounterIsAllZero=true;
 	for(size_t i=0;i<m_Counter.size();++i)
+	{
 		if(m_Counter[i]!=0)
+		{
 			CounterIsAllZero=false;
+			break;
+		}
+	}
 	if(CounterIsAllZero)
 		throw(InvalidState(AlgorithmName()));
 
@@ -190,14 +195,14 @@ void Fortuna_Base::GenerateSmallBlock(byte* output,size_t size)
 	{
 		if((NewKey.size()-i)>=GetCipher()->BlockSize())
 		{
-			CipherInstance.m_p->ProcessBlock(m_Counter,NewKey);
+			CipherInstance.m_p->ProcessBlock(m_Counter,NewKey+i);
 			IncrementCounterByOne(m_Counter,static_cast<unsigned int>(m_Counter.size()));
 		}
 		else
 		{
 			SecByteBlock Buffer(GetCipher()->BlockSize());
 			CipherInstance.m_p->ProcessBlock(m_Counter,Buffer);
-			memcpy(NewKey,Buffer,NewKey.size()-i);
+			memcpy(NewKey+i,Buffer,NewKey.size()-i);
 			IncrementCounterByOne(m_Counter,static_cast<unsigned int>(m_Counter.size()));
 		}
 	}
@@ -252,7 +257,7 @@ void AutoSeededFortuna_Base::GenerateSmallBlock(byte* output,size_t size)
 void AutoSeededFortuna_Base::ReadSeedFile(const byte* input,size_t length)
 {
 	Fortuna_Base::ReadSeedFile(input,length);
-	GenerateMachineSignature();
+//	GenerateMachineSignature();
 }
 
 enum StaticSourceIDs
