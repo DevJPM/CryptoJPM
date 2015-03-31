@@ -1,4 +1,4 @@
-// dhash.h - written and placed in the public domain by 
+// dhash.h - written and placed in the public domain by Stanislav Ivochkin <isn@extrn.org>
 
 #ifndef CRYPTOPP_DHASH_H
 #define CRYPTOPP_DHASH_H
