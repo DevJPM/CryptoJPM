@@ -33,7 +33,7 @@ public:
 	{
 		m_hash.Restart();
 		SecByteBlock Zeros;
-		if(m_hash.Blocksize()!=0)
+		if(m_hash.BlockSize()!=0)
 			Zeros.CleanNew(m_hash.BlockSize());
 		else
 			Zeros.CleanNew(2*m_hash.DigestSize());
