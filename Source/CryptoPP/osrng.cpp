@@ -180,8 +180,16 @@ void OS_GenerateRandomBlock(bool blocking, byte *output, size_t size)
 	}
 }
 
-#define HAS_RDRAND_INTRINSIC_COMPILER_SUPPORT (_MSC_VER>=1700)
-#define HAS_RDSEED_INTRINSIC_COMPILER_SUPPORT (_MSC_VER>=1800)
+#if (_MSC_VER >= 1700) || (__GNUC_MAJOR__ > 4) || ((__GNUC_MAJOR__==4)&&(__GNUC_MINOR__>=6))
+#define HAS_RDRAND_INTRINSIC_COMPILER_SUPPORT 1
+#else
+#define HAS_RDRAND_INTRINSIC_COMPILER_SUPPORT 0
+#endif
+#if (_MSC_VER >= 1800) || (__GNUC_MAJOR__ > 4) || ((__GNUC_MAJOR__==4)&&(__GNUC_MINOR__>=8))
+#define HAS_RDSEED_INTRINSIC_COMPILER_SUPPORT 1
+#else
+#define HAS_RDSEED_INTRINSIC_COMPILER_SUPPORT 0
+#endif
 
 bool GenerateRDRANDData(byte* output,size_t size)
 {
@@ -204,7 +212,7 @@ bool GenerateRDRANDData(byte* output,size_t size)
 		if(size > WORD_SIZE)
 		{
 			*((word*)output)=Buffer;
-			AmountCopied=4;
+			AmountCopied=sizeof(word);
 		}
 		else
 		{
@@ -241,7 +249,7 @@ bool GenerateRDSEEDData(byte* output,size_t size)
 		if(size > WORD_SIZE)
 		{
 			*((word*)output)=Buffer;
-			AmountCopied=4;
+			AmountCopied=sizeof(word);
 		}
 		else
 		{

@@ -276,7 +276,7 @@ void AutoSeededFortuna_Base::PollFast()
 #ifdef CRYPTOPP_WIN32_AVAILABLE
 	word32 Buffer;
 	POINT BufferPoint;
-	MEMORYSTATUS MemoryData;
+	MEMORYSTATUSEX MemoryData;
 	ConvertToIntAndIncorporate(GetActiveWindow(),BASIC_SYSTEM_DATA);
 	ConvertToIntAndIncorporate(GetCapture(),BASIC_SYSTEM_DATA);
 	ConvertToIntAndIncorporate(GetClipboardOwner(),BASIC_SYSTEM_DATA);
@@ -301,9 +301,9 @@ void AutoSeededFortuna_Base::PollFast()
 	GetCursorPos(&BufferPoint);
 	IncorporateEntropyEx((byte*)&BufferPoint,sizeof(POINT),BASIC_SYSTEM_DATA);
 
-	MemoryData.dwLength=sizeof(MEMORYSTATUS);
-	GlobalMemoryStatus(&MemoryData);
-	IncorporateEntropyEx((byte*)&MemoryData,sizeof(MEMORYSTATUS),BASIC_SYSTEM_DATA);
+	MemoryData.dwLength=sizeof(MEMORYSTATUSEX);
+	GlobalMemoryStatusEx(&MemoryData);
+	IncorporateEntropyEx((byte*)&MemoryData,sizeof(MEMORYSTATUSEX),BASIC_SYSTEM_DATA);
 
 	FILETIME TimeBufferA,TimeBufferB,TimeBufferC,TimeBufferD;
 	HANDLE HandleBuffer = GetCurrentThread();
