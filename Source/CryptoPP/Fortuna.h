@@ -20,6 +20,10 @@
 #include <atomic>
 #endif
 
+#ifdef CRYPTOPP_WIN32_AVAILABLE
+#include <Windows.h> // I'm so sorry :-(
+#endif
+
 NAMESPACE_BEGIN(CryptoPP)
 
 class CRYPTOPP_NO_VTABLE Fortuna_Base : public RandomNumberGenerator, public NotCopyable
@@ -95,9 +99,21 @@ typedef Fortuna<AES,DoubledHash<SHA256> > OriginalFortuna;
 class CRYPTOPP_NO_VTABLE AutoSeededFortuna_Base : public Fortuna_Base
 {
 public:
+	static const bool ALLOW_NETWORK_ACTIVITY = true;
+	static const bool ALLOW_NETWORK_STATS = true;
+	static const bool ALLOW_REGISTRY_QUERIES = true;
+	static const bool ALLOW_KEYBOARD_MONITORING = true;
+	static const bool ALLOW_MOUSE_MONITORING = true;
+	static const bool ALLOW_DISK_QUERIES = true;
+public:
+	CRYPTOPP_CONSTANT(NUMBER_MILLISECONDS_BETWEEN_FAST_POLLS = 100)
+	CRYPTOPP_CONSTANT(NUMBER_MILLISECONDS_BETWEEN_SLOW_POLLS = 1000)
+public:
 	// slow poll can only be activated if multithreading (MT) is allowed, if MT is off, slowpoll switch will be ignored
 	// the compile-time switch for MT will always override this switch
 	AutoSeededFortuna_Base(bool AllowSlowPoll=true,bool AllowMultithreading=true);
+
+	~AutoSeededFortuna_Base();
 	// always use values from TrueCrypt's fast poll (in generation call if non-MT and in own thread if MT)
 	// use values from TrueCrypt's slow poll if multithreading is allowed & slow polls are allowed
 	// use keyboard and mouse data if multithreading is allowed
@@ -115,10 +131,18 @@ protected:
 	// adds some entropy by using machine-specific (random) data
 	void GenerateMachineSignature();
 	void PollFast();
+	void PollSlow();
+	void PollMTFast();
+private:
+	void FastPollThreadFunction();
+	void SlowPollThreadFunction();
 private:
 	const bool m_PollAtCalltime;
+	const bool m_AllowSlowPoll;
 #if CRYPTOPP_BOOL_CPP11_THREAD_SUPPORTED
-	
+	std::atomic<bool> m_RunThreads;
+	std::thread m_FastPollThread;
+	std::thread m_SlowPollThread;
 #endif
 };
 
@@ -140,6 +164,9 @@ private:
 // equivalent to what was proposed by Schneier and Fergueson
 typedef AutoSeededFortuna<AES,SHA256> StandardAutoSeededFortuna;
 
+void InstallHooks();
+void UninstallHooks();
+
 // if multithreading is allowed, the following class will instantiate a single Fortuna instance and feed it with all data available
 // if multithreading isn't allowed, the following class will instantiate a single Fortuna instance and feed it with non-MT data only
 // don't use this class if you can't guarantee consistent template-parameters
@@ -148,7 +175,10 @@ template<class CIPHER,class RESEED_HASH,class POOL_HASH = RESEED_HASH>
 class AutoSeededFortunaSingleton : public RandomNumberGenerator, public NotCopyable
 {
 public:
+	AutoSeededFortunaSingleton(){InstallHooks();}
+	~AutoSeededFortunaSingleton(){UninstallHooks();}
 	virtual void IncorporateEntropy(const byte *input, size_t length) {GetSingleton()->IncorporateEntropy(input,length);}
+	virtual void IncorporateEntropyEx(const byte *input, size_t length,byte SourceNumber) {GetSingleton()->IncorporateEntropyEx(input,length,SourceNumber);}
 	virtual bool CanIncorporateEntropy() const {return GetSingleton()->CanIncorporateEntropy();}
 	virtual void GenerateBlock(byte *output, size_t size) {GetSingleton()->GenerateBlock(output,size);}
 	virtual void GenerateSeedFile(byte* output,size_t length) {GetSingleton()->GenerateSeedFile(output,length);}

@@ -33,6 +33,8 @@ void Fortuna_Base::Initialize()
 	m_ReseedTimer.StartTimer();
 	for(byte i=0;i<NUM_POOLS;++i)
 		GetPoolHash(i)->Restart();
+
+
 }
 
 void Fortuna_Base::IncorporateEntropyEx(const byte* Input,size_t length,byte SourceNumber)
@@ -231,19 +233,33 @@ void Fortuna_Base::Reseed(const byte* NewSeed,size_t seedlen)
 
 AutoSeededFortuna_Base::AutoSeededFortuna_Base(bool AllowSlowPoll,bool AllowMultithreading) :
 #if CRYPTOPP_BOOL_CPP11_THREAD_SUPPORTED
-	m_PollAtCalltime(!AllowMultithreading)
+	m_PollAtCalltime(!AllowMultithreading),
+	m_AllowSlowPoll(AllowMultithreading && AllowSlowPoll),
+	m_RunThreads(true)
 #else
-	m_PollAtCalltime(true)
+	m_PollAtCalltime(true),
+	m_AllowSlowPoll(false)
 #endif
 {
 	Initialize();
 	// compile and run-time check
 	// put this in #if/#endif clause because some variables may otherwise be undefined
 #if CRYPTOPP_BOOL_CPP11_THREAD_SUPPORTED
-	if(m_PollAtCalltime)
+	if(!m_PollAtCalltime)
 	{
+		// launch threads here
+		m_FastPollThread=std::thread(&AutoSeededFortuna_Base::FastPollThreadFunction,this);
 
+		if(m_AllowSlowPoll)
+			m_SlowPollThread=std::thread(&AutoSeededFortuna_Base::SlowPollThreadFunction,this);
 	}
+#endif
+}
+
+AutoSeededFortuna_Base::~AutoSeededFortuna_Base()
+{
+#if CRYPTOPP_BOOL_CPP11_THREAD_SUPPORTED
+	m_RunThreads=false;
 #endif
 }
 
@@ -264,7 +280,11 @@ enum StaticSourceIDs
 {
 	BASIC_SYSTEM_DATA,
 	SYSTEM_TIMING_DATA,
-	SYSTEM_RNG_DATA
+	SYSTEM_RNG_DATA,
+	DRIVE_TIMING_DATA,
+	NETWORK_SERVICE_DATA,
+	KEYBOARD_DATA,
+	MOUSE_DATA
 };
 
 #define ConvertToIntAndIncorporate(VALUE,ID) \
@@ -295,6 +315,11 @@ void AutoSeededFortuna_Base::PollFast()
 	ConvertToIntAndIncorporate(GetProcessHeap(),BASIC_SYSTEM_DATA);
 	ConvertToIntAndIncorporate(GetProcessWindowStation(),BASIC_SYSTEM_DATA);
 	ConvertToIntAndIncorporate(GetQueueStatus(QS_ALLEVENTS),BASIC_SYSTEM_DATA);
+
+	OSVERSIONINFOEX OSVersion;
+	OSVersion.dwOSVersionInfoSize=sizeof(OSVERSIONINFOEX);
+	GetVersionEx((LPOSVERSIONINFO)(&OSVersion));
+	IncorporateEntropyEx((byte*)&OSVersion,sizeof(OSVersion),BASIC_SYSTEM_DATA);
 
 	GetCaretPos(&BufferPoint);
 	IncorporateEntropyEx((byte*)&BufferPoint,sizeof(POINT),BASIC_SYSTEM_DATA);
@@ -329,6 +354,210 @@ void AutoSeededFortuna_Base::PollFast()
 	SecByteBlock DataBuffer(256);
 	OS_GenerateRandomBlock(true,DataBuffer,256);
 	IncorporateEntropyEx(DataBuffer,256,SYSTEM_RNG_DATA);
+
+	GenerateRDSEEDData(DataBuffer,64);
+	IncorporateEntropyEx(DataBuffer,64,SYSTEM_RNG_DATA);
+
+	GenerateRDRANDData(DataBuffer,256);
+	IncorporateEntropyEx(DataBuffer,256,SYSTEM_RNG_DATA);
+}
+
+#ifdef CRYPTOPP_WIN32_AVAILABLE
+class NetAPI32Loader
+{
+public:
+typedef DWORD (WINAPI * NETSTATISTICSGET) (LPWSTR szServer, LPWSTR szService,
+				     DWORD dwLevel, DWORD dwOptions,
+				     LPBYTE * lpBuffer);
+typedef DWORD (WINAPI * NETAPIBUFFERSIZE) (LPVOID lpBuffer, LPDWORD cbBuffer);
+typedef DWORD (WINAPI * NETAPIBUFFERFREE) (LPVOID lpBuffer);
+
+	NetAPI32Loader():
+		m_LibraryHandle(NULL),m_InitSuccessful(false),
+		m_NetStatisticsGetFP(NULL),m_NetApiBufferSizeFP(NULL),m_NetApiBufferFreeFP(NULL)
+	{
+		m_LibraryHandle=LoadLibrary("NETAPI32.DLL");
+		if(m_LibraryHandle==NULL)
+			return;
+		//load all functions
+		m_NetStatisticsGetFP = (NETSTATISTICSGET) GetProcAddress(m_LibraryHandle,"NetStatisticsGet");
+		m_NetApiBufferSizeFP = (NETAPIBUFFERSIZE) GetProcAddress(m_LibraryHandle,"NetApiBufferSize");
+		m_NetApiBufferFreeFP = (NETAPIBUFFERFREE) GetProcAddress(m_LibraryHandle,"NetApiBufferFree");
+
+		//free on error
+		if(m_NetStatisticsGetFP==NULL || m_NetApiBufferSizeFP==NULL || m_NetApiBufferFreeFP==NULL)
+		{
+			FreeLibrary(m_LibraryHandle);
+			m_LibraryHandle=NULL;
+			m_NetStatisticsGetFP=NULL;
+			m_NetApiBufferSizeFP=NULL;
+			m_NetApiBufferFreeFP=NULL;
+		}
+		m_InitSuccessful=true;
+	}
+	~NetAPI32Loader()
+	{
+		m_InitSuccessful=false;
+		if(m_LibraryHandle!=NULL)
+		{
+			FreeLibrary(m_LibraryHandle);
+			m_LibraryHandle=NULL;
+		}
+		m_NetStatisticsGetFP=NULL;
+		m_NetApiBufferSizeFP=NULL;
+		m_NetApiBufferFreeFP=NULL;
+	}
+	bool IsAvailable() const {return m_InitSuccessful;}
+	NETSTATISTICSGET GetNetStatisticsGetFP() const {return m_NetStatisticsGetFP;}
+	NETAPIBUFFERSIZE GetNetApiBufferSizeFP() const {return m_NetApiBufferSizeFP;}
+	NETAPIBUFFERFREE GetNetApiBufferFreeFP() const {return m_NetApiBufferFreeFP;}
+private:
+	HMODULE m_LibraryHandle;
+	bool m_InitSuccessful;
+	NETSTATISTICSGET m_NetStatisticsGetFP;
+	NETAPIBUFFERSIZE m_NetApiBufferSizeFP;
+	NETAPIBUFFERFREE m_NetApiBufferFreeFP;
+};
+#endif
+
+void AutoSeededFortuna_Base::PollSlow()
+{
+#ifdef CRYPTOPP_WIN32_AVAILABLE
+	if(ALLOW_NETWORK_STATS)
+	{
+		if(Singleton<NetAPI32Loader>().Ref().IsAvailable())
+		{
+			byte* DataBuffer;
+			DWORD BufferSize;
+			wchar_t* ServerService = L"LanmanServer"; // always available
+			wchar_t* WorkstationService = L"LanmanWorkstation"; // always available
+			if(Singleton<NetAPI32Loader>().Ref().GetNetStatisticsGetFP()(NULL,ServerService,0,0,&DataBuffer)==0)
+			{
+				Singleton<NetAPI32Loader>().Ref().GetNetApiBufferSizeFP()(DataBuffer,&BufferSize);
+				IncorporateEntropyEx(DataBuffer,BufferSize,NETWORK_SERVICE_DATA);
+				Singleton<NetAPI32Loader>().Ref().GetNetApiBufferFreeFP()(DataBuffer);
+			}
+			if(Singleton<NetAPI32Loader>().Ref().GetNetStatisticsGetFP()(NULL,WorkstationService,0,0,&DataBuffer)==0)
+			{
+				Singleton<NetAPI32Loader>().Ref().GetNetApiBufferSizeFP()(DataBuffer,&BufferSize);
+				IncorporateEntropyEx(DataBuffer,BufferSize,NETWORK_SERVICE_DATA);
+				Singleton<NetAPI32Loader>().Ref().GetNetApiBufferFreeFP()(DataBuffer);
+			}
+		}
+	}
+
+	if(ALLOW_DISK_QUERIES)
+	{
+		const std::string StandardAccess = "\\\\.\\PhysicalDrive";
+		for(word32 DriveIndex;;++DriveIndex)
+		{
+			DISK_PERFORMANCE PerfData;
+			DWORD ActualSize;
+			HANDLE Device;
+
+			std::string AccesName = StandardAccess + std::to_string(DriveIndex);
+			Device=CreateFile(AccesName.c_str(),0,FILE_SHARE_READ|FILE_SHARE_WRITE,NULL,OPEN_EXISTING,0,NULL);
+			if(Device==INVALID_HANDLE_VALUE)
+				break;
+			if(DeviceIoControl(Device,IOCTL_DISK_PERFORMANCE,NULL,0,&PerfData,sizeof(DISK_PERFORMANCE),&ActualSize,0))
+			{
+				IncorporateEntropyEx((byte*)&PerfData,ActualSize,DRIVE_TIMING_DATA);
+			}
+			CloseHandle(Device);
+		}
+	}
+#endif
+}
+
+void AutoSeededFortuna_Base::PollMTFast()
+{
+
+}
+
+void AutoSeededFortuna_Base::FastPollThreadFunction()
+{
+	while(m_RunThreads)
+	{
+		PollFast();
+		PollMTFast();
+
+		std::this_thread::sleep_for(std::chrono::milliseconds(NUMBER_MILLISECONDS_BETWEEN_FAST_POLLS));
+	}
+}
+
+void AutoSeededFortuna_Base::SlowPollThreadFunction()
+{
+	while(m_RunThreads)
+	{
+		PollSlow();
+
+		std::this_thread::sleep_for(std::chrono::milliseconds(NUMBER_MILLISECONDS_BETWEEN_SLOW_POLLS));
+	}
+}
+
+#ifdef CRYPTOPP_WIN32_AVAILABLE
+
+LRESULT CALLBACK HookFunctionMouse(int Code,WPARAM wParam,LPARAM lParam)
+{
+	if(Code!=0)
+		CallNextHookEx(NULL,Code,wParam,lParam);
+
+	MSLLHOOKSTRUCT* Data=(MSLLHOOKSTRUCT*)lParam;
+
+	StandardAutoSeededFortunaSingleton().IncorporateEntropyEx((byte*)&wParam,sizeof(WPARAM),MOUSE_DATA);
+
+	StandardAutoSeededFortunaSingleton().IncorporateEntropyEx((byte*)Data,sizeof(MSLLHOOKSTRUCT),MOUSE_DATA);
+
+	return CallNextHookEx(NULL,Code,wParam,lParam);
+}
+
+LRESULT CALLBACK HookFunctionKeyboard(int Code,WPARAM wParam,LPARAM lParam)
+{
+	if(Code!=0) // only allowed code HC_ACTION (=0)
+		CallNextHookEx(NULL,Code,wParam,lParam);
+
+	KBDLLHOOKSTRUCT* Data=(KBDLLHOOKSTRUCT*)lParam;
+
+	StandardAutoSeededFortunaSingleton().IncorporateEntropyEx((byte*)&wParam,sizeof(WPARAM),KEYBOARD_DATA);
+
+	StandardAutoSeededFortunaSingleton().IncorporateEntropyEx((byte*)Data,sizeof(KBDLLHOOKSTRUCT),KEYBOARD_DATA);
+
+	return CallNextHookEx(NULL,Code,wParam,lParam);
+}
+
+class Hooker
+{
+	Hooker()
+	{
+		if(AutoSeededFortuna_Base::ALLOW_KEYBOARD_MONITORING)
+			m_Mouse = SetWindowsHookEx(WH_KEYBOARD_LL,HookFunctionMouse,GetModuleHandle(NULL),0);
+		if(AutoSeededFortuna_Base::ALLOW_MOUSE_MONITORING)
+			m_Keyboard = SetWindowsHookEx(WH_MOUSE_LL,HookFunctionKeyboard,GetModuleHandle(NULL),0);
+	}
+	~Hooker()
+	{
+		if(m_Mouse)
+			UnhookWindowsHookEx(m_Mouse);
+		if(m_Keyboard)
+			UnhookWindowsHookEx(m_Keyboard);
+	}
+private:
+	HHOOK m_Mouse;
+	HHOOK m_Keyboard;
+};
+
+#endif
+
+void InstallHooks()
+{
+#ifdef CRYPTOPP_WIN32_AVAILABLE
+	Singleton<Hooker>().Ref();
+#endif	
+}
+
+void UninstallHooks()
+{
+	
 }
 
 NAMESPACE_END
