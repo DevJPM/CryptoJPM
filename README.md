@@ -13,7 +13,6 @@ algorithms include:
 planned algorithms:
 - post-quantum public key cryptography (mceliece?)
 - PHC winner(s)
-~~- Argon PBKDF as it is optimized for desktops/servers (man appliance of Crypto++ / CryptoJPM)~~
 
 production use is NOT recommended
 
