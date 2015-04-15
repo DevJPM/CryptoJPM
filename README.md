@@ -14,6 +14,8 @@ planned algorithms:
 - post-quantum public key cryptography (mceliece?)
 - PHC winner(s)
 
+ ~~Argon PBKDF as it is optimized for desktops/servers (man appliance of Crypto++ / CryptoJPM)~~ (cancelled, as no longer only depends on AES)
+
 production use is NOT recommended
 
 You can use some parts of this fork for production use.
