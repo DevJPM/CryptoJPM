@@ -129,7 +129,7 @@ Integer InvertibleRWFunction::CalculateInverse(RandomNumberGenerator &rng, const
 	do {	// do this in a loop for people using small numbers for testing
 		r.Randomize(rng, Integer::One(), m_n - Integer::One());
 		rInv = modn.MultiplicativeInverse(r);
-	} while (rInv.IsZero());
+	} while (rInv.IsZero() || (Jacobi(r % m_p,m_p)==-1) || (Jacobi(r % m_q,m_q)==-1));
 	Integer re = modn.Square(r);
 	re = modn.Multiply(re, x);			// blind
 
